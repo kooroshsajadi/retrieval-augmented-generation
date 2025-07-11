@@ -3,7 +3,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import List
 
 class Generator(ABC):
-    @abstractmethod
+    @abstractmethod # Abstracts generation to support different LLMs (e.g., Grok, LLaMA)
     def generate(self, prompt: str, contexts: List[str]) -> str:
         """Generate response given a prompt and retrieved contexts."""
         pass
