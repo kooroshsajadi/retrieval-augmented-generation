@@ -3,12 +3,16 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import List
 
 class Generator(ABC):
-    @abstractmethod # Abstracts generation to support different LLMs (e.g., Grok, LLaMA)
+    """Abstract base class for generation models, defining the interface for text generation."""
+    
+    @abstractmethod
     def generate(self, prompt: str, contexts: List[str]) -> str:
         """Generate response given a prompt and retrieved contexts."""
         pass
 
 class HuggingFaceGenerator(Generator):
+    """Implements text generation using a Hugging Face pre-trained language model."""
+    
     def __init__(self, model_name: str = "gpt2"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)

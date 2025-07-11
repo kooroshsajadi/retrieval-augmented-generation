@@ -3,6 +3,8 @@ from .retriever import Retriever
 from .generator import Generator
 
 class RAGPipeline:
+    """Orchestrates the Retrieval-Augmented Generation process by combining retriever and generator components."""
+    
     def __init__(self, retriever: Retriever, generator: Generator, top_k: int = 5):
         self.retriever = retriever
         self.generator = generator
