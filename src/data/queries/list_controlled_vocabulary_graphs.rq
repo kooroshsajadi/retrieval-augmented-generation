@@ -9,6 +9,6 @@
 SELECT DISTINCT ?g
 WHERE {
   GRAPH ?g { ?s ?p ?o }
-  FILTER(CONTAINS(STR(?g), "contolled-vocabulary"))
+  FILTER(CONTAINS(STR(?g), "controlled-vocabulary"))
 }
 ORDER BY ?g
