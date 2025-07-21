@@ -26,7 +26,7 @@ if __name__ == "__main__":
     endpoint_url = "http://localhost:7200/repositories/rag"
 
     # Load SPARQL query from a file
-    query_file = "src/data/queries/list_entity_types.rq"
+    query_file = "src/data/queries/list_ontology_graphs.rq"
     with open(query_file, "r", encoding="utf-8") as f:
         query = f.read()
 
