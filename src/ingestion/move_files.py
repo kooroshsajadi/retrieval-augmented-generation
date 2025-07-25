@@ -1,4 +1,3 @@
-# src/ingestion/move_files.py
 import os
 import shutil
 import zipfile
