@@ -1,6 +1,8 @@
 import os
 import json
 from typing import Dict, Optional, Tuple
+
+import paddle
 import pdfplumber
 from paddleocr import PaddleOCR
 from pathlib import Path
