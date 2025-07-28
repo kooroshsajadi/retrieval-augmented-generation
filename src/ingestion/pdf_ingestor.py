@@ -26,7 +26,7 @@ class PDFIngestor:
             metadata_dir (str): Directory containing classification metadata.
             output_dir (str): Directory to save extracted text files.
             max_pages (Optional[int]): Maximum pages to process per PDF (default: all).
-            language (str): Language code for PaddleOCR (e.g., 'ita' for Italian).
+            language (str): Language code for PaddleOCR (e.g., 'it' for Italian).
         """
         self.input_dir = Path(input_dir)
         self.metadata_dir = Path(metadata_dir)
