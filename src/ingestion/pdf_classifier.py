@@ -1,7 +1,6 @@
 import os
 import json
 from typing import Dict, Optional, Tuple
-
 import paddle
 import pdfplumber
 from paddleocr import PaddleOCR
@@ -19,7 +18,7 @@ class PDFClassifier:
         metadata_dir: str = "data/metadata",
         min_text_length: int = 100,
         ocr_sample_pages: int = 1,
-        language: str = "ita",
+        language: str = "it",
     ):
         """
         Initialize PDFClassifier with configuration parameters.
@@ -29,7 +28,7 @@ class PDFClassifier:
             metadata_dir (str): Directory to save classification metadata.
             min_text_length (int): Minimum character count to consider a PDF text-based.
             ocr_sample_pages (int): Number of pages to sample for OCR check.
-            language (str): Language code for PaddleOCR (e.g., 'ita' for Italian).
+            language (str): Language code for PaddleOCR (e.g., 'it' for Italian).
         """
         self.input_dir = Path(input_dir)
         self.metadata_dir = Path(metadata_dir)
