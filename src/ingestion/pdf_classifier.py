@@ -1,9 +1,10 @@
 import os
+import numpy as np
 import json
 from typing import Dict, Optional, Tuple
-import paddle
 import pdfplumber
-from paddleocr import PaddleOCR
+import pytesseract
+from PIL import Image, ImageEnhance
 from pathlib import Path
 import logging
 import re
@@ -28,7 +29,7 @@ class PDFClassifier:
             metadata_dir (str): Directory to save classification metadata.
             min_text_length (int): Minimum character count to consider a PDF text-based.
             ocr_sample_pages (int): Number of pages to sample for OCR check.
-            language (str): Language code for PaddleOCR (e.g., 'it' for Italian).
+            language (str): Language code for OCR (e.g., 'it' for Italian).
         """
         self.input_dir = Path(input_dir)
         self.metadata_dir = Path(metadata_dir)
@@ -36,7 +37,6 @@ class PDFClassifier:
         self.ocr_sample_pages = ocr_sample_pages
         self.language = language
         self.logger = setup_logger("pdf_classifier")
-        self.paddle_ocr = None  # Lazy initialization for PaddleOCR
         self.ontology_terms = {
             "ex:Technology": r"\b(technology|tecnologia|AI|intelligenza artificiale)\b",
             "ex:Legislation": r"\b(legge|decreto|articolo|regulation)\b",
@@ -44,16 +44,6 @@ class PDFClassifier:
 
         # Ensure metadata directory exists
         self.metadata_dir.mkdir(parents=True, exist_ok=True)
-
-    def initialize_paddle_ocr(self) -> None:
-        """Initialize PaddleOCR instance if not already initialized."""
-        if self.paddle_ocr is None:
-            try:
-                self.logger.info("Initializing PaddleOCR with language: %s", self.language)
-                self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang=self.language, show_log=False)
-            except Exception as e:
-                self.logger.error("Failed to initialize PaddleOCR: %s", str(e))
-                raise RuntimeError(f"PaddleOCR initialization failed: {e}")
 
     def is_valid_text(self, text: str) -> bool:
         """
@@ -109,9 +99,9 @@ class PDFClassifier:
             self.logger.error("pdfplumber extraction failed for %s: %s", file_path, str(e))
             return "", False
 
-    def extract_text_with_paddleocr(self, file_path: Path) -> Tuple[str, bool]:
+    def extract_text_with_ocr(self, file_path: Path) -> Tuple[str, bool]:
         """
-        Perform lightweight OCR check using PaddleOCR on sample pages.
+        Perform lightweight OCR check using Tesseract on sample pages.
 
         Args:
             file_path (Path): Path to the PDF file.
@@ -119,25 +109,24 @@ class PDFClassifier:
         Returns:
             Tuple[str, bool]: Extracted text and success flag.
         """
-        self.initialize_paddle_ocr()
         text = ""
         try:
             from pdf2image import convert_from_path
             self.logger.info("Converting %d pages to images for OCR: %s", self.ocr_sample_pages, file_path)
             images = convert_from_path(file_path, first_page=1, last_page=self.ocr_sample_pages)
             for i, image in enumerate(images):
-                self.logger.debug("Running PaddleOCR on page %d", i + 1)
-                result = self.paddle_ocr.ocr(image, cls=True)
-                if result:
-                    for line in result:
-                        if line:  # Ensure line is not None
-                            for word_info in line:
-                                text += word_info[1][0] + " "  # Extract text from OCR result
-                text += "\n"
+                self.logger.debug("Running Tesseract OCR on page %d", i + 1)
+                # Enhance contrast
+                image = ImageEnhance.Contrast(image).enhance(2.0)
+                # Run Tesseract with Italian language
+                page_text = pytesseract.image_to_string(image, lang="ita")
+                text += page_text + "\n"
             success = self.is_valid_text(text)
+            self.logger.debug("OCR extracted text (first 500 chars): %s", text[:500])
+            self.logger.debug("Validation result: %s", success)
             return text, success
         except Exception as e:
-            self.logger.error("PaddleOCR extraction failed for %s: %s", file_path, str(e))
+            self.logger.error("Tesseract OCR extraction failed for %s: %s", file_path, str(e))
             return "", False
 
     def classify_pdf(self, file_path: Path) -> Dict[str, any]:
@@ -169,15 +158,15 @@ class PDFClassifier:
             self.logger.info("Classified as text-based: %s", file_path)
             return result
 
-        # Step 2: Fall back to PaddleOCR for image-based PDFs
-        text, success = self.extract_text_with_paddleocr(file_path)
+        # Step 2: Fall back to Tesseract OCR for image-based PDFs
+        text, success = self.extract_text_with_ocr(file_path)
         if success:
             result["pdf_type"] = "image-based"
             result["text_sample"] = text[:500]
             result["is_valid"] = True
             self.logger.info("Classified as image-based: %s", file_path)
         else:
-            result["error"] = "No valid text extracted with pdfplumber or PaddleOCR"
+            result["error"] = "No valid text extracted with pdfplumber or Tesseract OCR"
             self.logger.warning("Classification failed for %s: %s", file_path, result["error"])
 
         return result
@@ -230,6 +219,20 @@ class PDFClassifier:
         except Exception as e:
             self.logger.error("Failed to load metadata: %s", str(e))
             return []
-        
+
 if __name__ == "__main__":
     print("This module is not intended to be run directly. Use it as part of the RAG pipeline.")
+
+    '''Test PDF classification'''
+    try:
+        classifier = PDFClassifier(
+            input_dir="data/prefettura_v1",
+            metadata_dir="data/metadata",
+            min_text_length=100,
+            ocr_sample_pages=1,
+            language="it"
+        )
+        classifier.process_directory()
+        print("PDF classification completed. Results saved to data/metadata/classification_metadata.json")
+    except Exception as e:
+        print(f"Error during classification: {e}")
