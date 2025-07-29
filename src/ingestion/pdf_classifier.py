@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import json
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 import pdfplumber
 import pytesseract
 from PIL import Image, ImageEnhance
@@ -9,6 +9,7 @@ from pathlib import Path
 import logging
 import re
 from src.utils.logging_utils import setup_logger
+from pdf2image import convert_from_path
 
 class PDFClassifier:
     """Classifies PDFs as text-based or image-based for ingestion pipeline."""
@@ -111,7 +112,6 @@ class PDFClassifier:
         """
         text = ""
         try:
-            from pdf2image import convert_from_path
             self.logger.info("Converting %d pages to images for OCR: %s", self.ocr_sample_pages, file_path)
             images = convert_from_path(file_path, first_page=1, last_page=self.ocr_sample_pages)
             for i, image in enumerate(images):
@@ -119,7 +119,7 @@ class PDFClassifier:
                 # Enhance contrast
                 image = ImageEnhance.Contrast(image).enhance(2.0)
                 # Run Tesseract with Italian language
-                page_text = pytesseract.image_to_string(image, lang="ita")
+                page_text = pytesseract.image_to_string(image, lang="it")
                 text += page_text + "\n"
             success = self.is_valid_text(text)
             self.logger.debug("OCR extracted text (first 500 chars): %s", text[:500])
@@ -129,7 +129,7 @@ class PDFClassifier:
             self.logger.error("Tesseract OCR extraction failed for %s: %s", file_path, str(e))
             return "", False
 
-    def classify_pdf(self, file_path: Path) -> Dict[str, any]:
+    def classify_pdf(self, file_path: Path) -> Dict[str, Any]:
         """
         Classify a PDF as text-based or image-based.
 
