@@ -1,14 +1,16 @@
 import json
 import os
 from typing import Dict, List, Optional, Tuple, Any
-import pdfplumber 
-from paddleocr import PaddleOCR 
+import pdfplumber
+import pytesseract
+from PIL import Image, ImageEnhance
+from pdf2image import convert_from_path
 from pathlib import Path
 import logging
 from src.utils.logging_utils import setup_logger
 
 class PDFIngestor:
-    """Extracts text from PDFs using pdfplumber or PaddleOCR based on classification."""
+    """Extracts text from PDFs using pdfplumber or Tesseract based on classification."""
 
     def __init__(
         self,
@@ -26,7 +28,7 @@ class PDFIngestor:
             metadata_dir (str): Directory containing classification metadata.
             output_dir (str): Directory to save extracted text files.
             max_pages (Optional[int]): Maximum pages to process per PDF (default: all).
-            language (str): Language code for PaddleOCR (e.g., 'it' for Italian).
+            language (str): Language code for Tesseract OCR (e.g., 'it' for Italian).
         """
         self.input_dir = Path(input_dir)
         self.metadata_dir = Path(metadata_dir)
@@ -34,20 +36,9 @@ class PDFIngestor:
         self.max_pages = max_pages
         self.language = language
         self.logger = setup_logger("pdf_ingestor")
-        self.paddle_ocr = None  # Lazy initialization for PaddleOCR
 
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
-    def initialize_paddle_ocr(self) -> None:
-        """Initialize PaddleOCR instance if not already initialized."""
-        if self.paddle_ocr is None:
-            try:
-                self.logger.info("Initializing PaddleOCR with language: %s", self.language)
-                self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang=self.language, show_log=False)
-            except Exception as e:
-                self.logger.error("Failed to initialize PaddleOCR: %s", str(e))
-                raise RuntimeError(f"PaddleOCR initialization failed: {e}")
 
     def load_classification_metadata(self) -> List[Dict[str, Any]]:
         """
@@ -107,9 +98,9 @@ class PDFIngestor:
             self.logger.error("pdfplumber extraction failed for %s: %s", file_path, str(e))
             return "", [{"page_number": 0, "error": str(e)}], False
 
-    def extract_text_with_paddleocr(self, file_path: Path) -> Tuple[str, List[Dict], bool]:
+    def extract_text_with_ocr(self, file_path: Path) -> Tuple[str, List[Dict], bool]:
         """
-        Extract text from an image-based PDF using PaddleOCR.
+        Extract text from an image-based PDF using Tesseract OCR.
 
         Args:
             file_path (Path): Path to the PDF file.
@@ -117,35 +108,32 @@ class PDFIngestor:
         Returns:
             Tuple[str, List[Dict], bool]: Extracted text, page metadata, and success flag.
         """
-        self.initialize_paddle_ocr()
         text = ""
         page_metadata = []
         try:
-            from pdf2image import convert_from_path
-            pages_to_read = self.max_pages or float("inf")
             self.logger.info("Converting pages to images for OCR: %s", file_path)
-            images = convert_from_path(file_path, first_page=1, last_page=pages_to_read)
-            pages_to_read = min(len(images), pages_to_read)
-            self.logger.info("Extracting text from %d pages with PaddleOCR", pages_to_read)
+            if self.max_pages is not None:
+                images = convert_from_path(file_path, first_page=1, last_page=self.max_pages)
+                pages_to_read = min(len(images), self.max_pages)
+            else:
+                images = convert_from_path(file_path)
+                pages_to_read = len(images)
+            self.logger.info("Extracting text from %d pages with Tesseract OCR", pages_to_read)
             for i, image in enumerate(images):
-                self.logger.debug("Running PaddleOCR on page %d", i + 1)
-                result = self.paddle_ocr.ocr(image, cls=True)
-                page_text = ""
-                if result:
-                    for line in result:
-                        if line:
-                            for word_info in line:
-                                page_text += word_info[1][0] + " "
+                self.logger.debug("Running Tesseract OCR on page %d", i + 1)
+                # Enhance contrast
+                image = ImageEnhance.Contrast(image).enhance(2.0)
+                page_text = pytesseract.image_to_string(image, lang="ita")
                 text += page_text + "\n"
                 page_metadata.append({
                     "page_number": i + 1,
                     "text_length": len(page_text),
-                    "source": "paddleocr"
+                    "source": "tesseract"
                 })
             success = len(text.strip()) > 0
             return text, page_metadata, success
         except Exception as e:
-            self.logger.error("PaddleOCR extraction failed for %s: %s", file_path, str(e))
+            self.logger.error("Tesseract OCR extraction failed for %s: %s", file_path, str(e))
             return "", [{"page_number": 0, "error": str(e)}], False
 
     def extract_text(self, file_path: Path, pdf_type: str) -> Dict[str, Any]:
@@ -173,7 +161,7 @@ class PDFIngestor:
         if pdf_type == "text-based":
             text, page_metadata, success = self.extract_text_with_pdfplumber(file_path)
         elif pdf_type == "image-based":
-            text, page_metadata, success = self.extract_text_with_paddleocr(file_path)
+            text, page_metadata, success = self.extract_text_with_ocr(file_path)
         else:
             result["error"] = f"Unknown PDF type: {pdf_type}"
             self.logger.error(result["error"])
@@ -260,6 +248,17 @@ class PDFIngestor:
             except Exception as e:
                 self.logger.error("Failed to load metadata: %s", str(e))
         return results
-    
+
 if __name__ == "__main__":
-    print("This module is not intended to be run directly. Use it as part of the RAG pipeline.")
+    try:
+        ingestor = PDFIngestor(
+            input_dir="data/prefettura_v1",
+            metadata_dir="data/metadata",
+            output_dir="data/extracted_text",
+            max_pages=None,
+            language="it"
+        )
+        ingestor.process_directory()
+        print("Text extraction completed. Results saved to data/extracted_text")
+    except Exception as e:
+        print(f"Error during text extraction: {e}")
