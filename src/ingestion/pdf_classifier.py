@@ -219,7 +219,7 @@ class PDFClassifier:
             return []
 
 if __name__ == "__main__":
-    with open('src/data/config.yaml') as file:
+    with open('configs/config.yaml') as file:
         config = yaml.safe_load(file)
     try:
         classifier = PDFClassifier(
