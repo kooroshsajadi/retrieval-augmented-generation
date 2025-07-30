@@ -119,7 +119,7 @@ class PDFClassifier:
                 # Enhance contrast
                 image = ImageEnhance.Contrast(image).enhance(2.0)
                 # Run Tesseract with Italian language
-                page_text = pytesseract.image_to_string(image, lang="it")
+                page_text = pytesseract.image_to_string(image, lang="ita")
                 text += page_text + "\n"
             success = self.is_valid_text(text)
             self.logger.debug("OCR extracted text (first 500 chars): %s", text[:500])
@@ -143,7 +143,6 @@ class PDFClassifier:
             "file_path": str(file_path),
             "file_name": file_path.name,
             "pdf_type": "unknown",
-            "text_sample": "",
             "is_valid": False,
             "error": None
         }
@@ -153,7 +152,6 @@ class PDFClassifier:
         text, success = self.extract_text_with_pdfplumber(file_path)
         if success:
             result["pdf_type"] = "text-based"
-            result["text_sample"] = text[:500]  # Truncate for metadata
             result["is_valid"] = True
             self.logger.info("Classified as text-based: %s", file_path)
             return result
@@ -162,7 +160,6 @@ class PDFClassifier:
         text, success = self.extract_text_with_ocr(file_path)
         if success:
             result["pdf_type"] = "image-based"
-            result["text_sample"] = text[:500]
             result["is_valid"] = True
             self.logger.info("Classified as image-based: %s", file_path)
         else:
@@ -221,9 +218,6 @@ class PDFClassifier:
             return []
 
 if __name__ == "__main__":
-    print("This module is not intended to be run directly. Use it as part of the RAG pipeline.")
-
-    '''Test PDF classification'''
     try:
         classifier = PDFClassifier(
             input_dir="data/prefettura_v1",
