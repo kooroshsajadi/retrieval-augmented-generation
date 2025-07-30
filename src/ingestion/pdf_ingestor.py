@@ -8,6 +8,7 @@ from pdf2image import convert_from_path
 from pathlib import Path
 import logging
 from src.utils.logging_utils import setup_logger
+import yaml
 
 class PDFIngestor:
     """Extracts text from PDFs using pdfplumber or Tesseract based on classification."""
@@ -15,7 +16,7 @@ class PDFIngestor:
     def __init__(
         self,
         input_dir: str = "data/destination",
-        metadata_dir: str = "data/metadata",
+        metadata_path: str = "data/metadata_file.json",
         output_dir: str = "data/extracted_text",
         max_pages: Optional[int] = None,
         language: str = "it",
@@ -25,13 +26,13 @@ class PDFIngestor:
 
         Args:
             input_dir (str): Directory containing PDFs to process.
-            metadata_dir (str): Directory containing classification metadata.
+            metadata_path (str): Path to the file containing classification metadata.
             output_dir (str): Directory to save extracted text files.
             max_pages (Optional[int]): Maximum pages to process per PDF (default: all).
             language (str): Language code for Tesseract OCR (e.g., 'it' for Italian).
         """
         self.input_dir = Path(input_dir)
-        self.metadata_dir = Path(metadata_dir)
+        self.metadata_path = Path(metadata_path)
         self.output_dir = Path(output_dir)
         self.max_pages = max_pages
         self.language = language
@@ -47,7 +48,7 @@ class PDFIngestor:
         Returns:
             List[Dict[str, Any]]: List of classification result dictionaries.
         """
-        metadata_file = self.metadata_dir / "classification_metadata.json"
+        metadata_file = self.metadata_path
         if not metadata_file.exists():
             self.logger.error("Metadata file not found: %s", metadata_file)
             raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
@@ -196,10 +197,18 @@ class PDFIngestor:
             self.logger.error("Failed to save text to %s: %s", text_file, str(e))
             result["error"] = str(e)
 
-        # Save metadata
+        # Save metadata (excluding text)
+        metadata = {
+            "file_path": result["file_path"],
+            "file_name": result["file_name"],
+            "pdf_type": result["pdf_type"],
+            "page_metadata": result["page_metadata"],
+            "is_valid": result["is_valid"],
+            "error": result["error"]
+        }
         try:
             with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
             self.logger.info("Saved extraction metadata to %s", metadata_file)
         except Exception as e:
             self.logger.error("Failed to save metadata to %s: %s", metadata_file, str(e))
@@ -250,11 +259,13 @@ class PDFIngestor:
         return results
 
 if __name__ == "__main__":
+    with open('src/data/config.yaml') as file:
+        config = yaml.safe_load(file)
     try:
         ingestor = PDFIngestor(
-            input_dir="data/prefettura_v1",
-            metadata_dir="data/metadata",
-            output_dir="data/extracted_text",
+            input_dir=config['files']['prefettura_v1'],
+            metadata_path=config['metadata']['prefettura_v1'],
+            output_dir=config['texts']['prefettura_v1'],
             max_pages=None,
             language="it"
         )
