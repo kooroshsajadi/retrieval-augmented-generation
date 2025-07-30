@@ -10,6 +10,7 @@ import logging
 import re
 from src.utils.logging_utils import setup_logger
 from pdf2image import convert_from_path
+import yaml
 
 class PDFClassifier:
     """Classifies PDFs as text-based or image-based for ingestion pipeline."""
@@ -218,15 +219,17 @@ class PDFClassifier:
             return []
 
 if __name__ == "__main__":
+    with open('src/data/config.yaml') as file:
+        config = yaml.safe_load(file)
     try:
         classifier = PDFClassifier(
-            input_dir="data/prefettura_v1",
-            metadata_dir="data/metadata",
+            input_dir=config['files']['prefettura_v1'],
+            metadata_dir=config['metadata']['directory'],
             min_text_length=100,
             ocr_sample_pages=1,
             language="it"
         )
         classifier.process_directory()
-        print("PDF classification completed. Results saved to data/metadata/classification_metadata.json")
+        print("PDF classification completed.")
     except Exception as e:
         print(f"Error during classification: {e}")
