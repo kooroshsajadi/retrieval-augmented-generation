@@ -259,7 +259,7 @@ class PDFIngestor:
         return results
 
 if __name__ == "__main__":
-    with open('configs/config.yaml') as file:
+    with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
     try:
         ingestor = PDFIngestor(

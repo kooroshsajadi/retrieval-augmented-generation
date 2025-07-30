@@ -3,7 +3,6 @@ import re
 from typing import Dict, List, Any
 from pathlib import Path
 import logging
-
 import yaml
 from src.utils.logging_utils import setup_logger
 
@@ -159,10 +158,18 @@ class TextCleaner:
             self.logger.error("Failed to save cleaned text to %s: %s", text_file, str(e))
             result["error"] = str(e)
 
-        # Save metadata
+        # Save metadata (excluding cleaned_text)
+        metadata = {
+            "file_path": result["file_path"],
+            "file_name": result["file_name"],
+            "is_valid": result["is_valid"],
+            "error": result["error"],
+            "original_length": result["original_length"],
+            "cleaned_length": result["cleaned_length"]
+        }
         try:
             with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
             self.logger.info("Saved cleaning metadata to %s", metadata_file)
         except Exception as e:
             self.logger.error("Failed to save metadata to %s: %s", metadata_file, str(e))
@@ -191,8 +198,20 @@ class TextCleaner:
         # Save summary metadata
         summary_file = self.output_dir / "cleaning_summary.json"
         try:
+            # Save metadata without cleaned_text
+            summary_metadata = [
+                {
+                    "file_path": r["file_path"],
+                    "file_name": r["file_name"],
+                    "is_valid": r["is_valid"],
+                    "error": r["error"],
+                    "original_length": r["original_length"],
+                    "cleaned_length": r["cleaned_length"]
+                }
+                for r in results
+            ]
             with open(summary_file, "w", encoding="utf-8") as f:
-                json.dump(results, f, ensure_ascii=False, indent=2)
+                json.dump(summary_metadata, f, ensure_ascii=False, indent=2)
             self.logger.info("Saved cleaning summary to %s", summary_file)
         except Exception as e:
             self.logger.error("Failed to save cleaning summary: %s", str(e))
@@ -217,7 +236,7 @@ class TextCleaner:
             return []
 
 if __name__ == "__main__":
-    with open('configs/config.yaml') as file:
+    with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
     try:
         cleaner = TextCleaner(
