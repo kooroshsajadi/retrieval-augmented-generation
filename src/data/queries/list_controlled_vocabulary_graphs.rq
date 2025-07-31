@@ -1,0 +1,14 @@
+##
+# Query Name: list_controlled_vocabulary_graphs
+# Purpose: Retrieve all named graphs (contexts) in the repository whose URI includes the substring "controlled_vocabulary".
+# Context: Applies to any RDF triple store where ontologies are in named graphs with 'controlled_vocabulary' in the URI.
+# Returns: ?g (IRI of each controlled_vocabulary graph)
+# Usage: Use to enumerate and audit all controlled_vocabulary graphs for discovery or scripting.
+##
+
+SELECT DISTINCT ?g
+WHERE {
+  GRAPH ?g { ?s ?p ?o }
+  FILTER(CONTAINS(STR(?g), "controlled-vocabulary"))
+}
+ORDER BY ?g
