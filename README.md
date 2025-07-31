@@ -4,9 +4,7 @@ This project implements a Retrieval-Augmented Generation (RAG) pipeline for proc
 
 ## 🗄️ Data Ingestion (Data Layer)
 
-The data ingestion part of the data layer processes 1227 Italian PDFs in `data/prefettura_v1` to produce chunked text ready for downstream embedding and storage. Key actions:
-
-- **pdf_classifier.py**: Classifies PDFs as text-based or image-based using `pdfplumber` and saves metadata to `data/metadata/classification_metadata.json` (no `text_sample`).
+- **pdf_classifier.py**: Classifies PDFs as text-based or image-based using `pdfplumber` and saves the result as metadata for later usage.
 - **pdf_ingestor.py**: Extracts text from PDFs using `pdfplumber` (text-based) or Tesseract OCR (image-based, `lang="it"`).
 - **text_cleaner.py**: Cleans extracted text.
 - **text_chunker.py**: Splits cleaned text into sentence-based chunks.
