@@ -13,6 +13,13 @@ This project implements a Retrieval-Augmented Generation (RAG) pipeline for proc
 
 Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
 
+## 📚 Data Sources
+
+- **Knowledge Graph of the Italian Legislation**
+  - Colombo, A. (2024). Knowledge Graph of the Italian Legislation [Data set]. Zenodo. DOI: 10.5281/zenodo.13798158
+
+- *(Add any further datasets as structured above)*
+
 ## 📄 License
 
 This project is licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0) (the "License"). You may not use, copy, modify, or distribute this project except in compliance with the License. A copy of the License is included in the [LICENSE](./LICENSE) file in this repository.
