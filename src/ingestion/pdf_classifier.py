@@ -12,8 +12,12 @@ from src.utils.logging_utils import setup_logger
 from pdf2image import convert_from_path
 import yaml
 
-class PDFClassifier:
-    """Classifies PDFs as text-based or image-based for ingestion pipeline."""
+
+class SourceClassifier:
+    """Classifies PDF, text, and image files for ingestion pipeline metadata."""
+
+    TEXT_EXTENSIONS = {'.txt'}
+    IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.jfif', '.bmp', '.tiff', '.gif'}
 
     def __init__(
         self,
@@ -24,12 +28,12 @@ class PDFClassifier:
         language: str = "it",
     ):
         """
-        Initialize PDFClassifier with configuration parameters.
+        Initialize SourceClassifier with configuration parameters.
 
         Args:
-            input_dir (str): Directory containing PDFs to classify.
+            input_dir (str): Directory containing files to classify.
             metadata_dir (str): Directory to save classification metadata.
-            min_text_length (int): Minimum character count to consider a PDF text-based.
+            min_text_length (int): Minimum character count to consider text valid.
             ocr_sample_pages (int): Number of pages to sample for OCR check.
             language (str): Language code for OCR (e.g., 'it' for Italian).
         """
@@ -38,7 +42,7 @@ class PDFClassifier:
         self.min_text_length = min_text_length
         self.ocr_sample_pages = ocr_sample_pages
         self.language = language
-        self.logger = setup_logger("pdf_classifier")
+        self.logger = setup_logger("source_classifier")
         self.ontology_terms = {
             "ex:Technology": r"\b(technology|tecnologia|AI|intelligenza artificiale)\b",
             "ex:Legislation": r"\b(legge|decreto|articolo|regulation)\b",
@@ -89,7 +93,11 @@ class PDFClassifier:
         try:
             with pdfplumber.open(file_path) as pdf:
                 pages_to_read = min(len(pdf.pages), self.ocr_sample_pages)
-                self.logger.info("Extracting text from %d pages with pdfplumber: %s", pages_to_read, file_path)
+                self.logger.info(
+                    "Extracting text from %d pages with pdfplumber: %s",
+                    pages_to_read,
+                    file_path,
+                )
                 for i in range(pages_to_read):
                     page = pdf.pages[i]
                     page_text = page.extract_text()
@@ -103,7 +111,7 @@ class PDFClassifier:
 
     def extract_text_with_ocr(self, file_path: Path) -> Tuple[str, bool]:
         """
-        Perform lightweight OCR check using Tesseract on sample pages.
+        Perform lightweight OCR check using Tesseract on sample pages of PDF.
 
         Args:
             file_path (Path): Path to the PDF file.
@@ -113,7 +121,9 @@ class PDFClassifier:
         """
         text = ""
         try:
-            self.logger.info("Converting %d pages to images for OCR: %s", self.ocr_sample_pages, file_path)
+            self.logger.info(
+                "Converting %d pages to images for OCR: %s", self.ocr_sample_pages, file_path
+            )
             images = convert_from_path(file_path, first_page=1, last_page=self.ocr_sample_pages)
             for i, image in enumerate(images):
                 self.logger.debug("Running Tesseract OCR on page %d", i + 1)
@@ -128,6 +138,25 @@ class PDFClassifier:
             return text, success
         except Exception as e:
             self.logger.error("Tesseract OCR extraction failed for %s: %s", file_path, str(e))
+            return "", False
+
+    def extract_text_from_txt(self, file_path: Path) -> Tuple[str, bool]:
+        """
+        Read text from a text file and validate.
+
+        Args:
+            file_path (Path): Path to the text file.
+
+        Returns:
+            Tuple[str, bool]: Extracted text and success flag.
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                text = f.read()
+            success = self.is_valid_text(text)
+            return text, success
+        except Exception as e:
+            self.logger.error("Failed to read text file %s: %s", file_path, str(e))
             return "", False
 
     def classify_pdf(self, file_path: Path) -> Dict[str, Any]:
@@ -145,7 +174,8 @@ class PDFClassifier:
             "file_name": file_path.name,
             "pdf_type": "unknown",
             "is_valid": False,
-            "error": None
+            "error": None,
+            "file_type": "pdf",
         }
 
         # Step 1: Try pdfplumber for text-based PDFs
@@ -169,9 +199,95 @@ class PDFClassifier:
 
         return result
 
+    def classify_txt(self, file_path: Path) -> Dict[str, Any]:
+        """
+        Classify a text file by validating if it contains meaningful text.
+
+        Args:
+            file_path (Path): Path to the text file.
+
+        Returns:
+            Dict[str, any]: Classification result with metadata.
+        """
+        result = {
+            "file_path": str(file_path),
+            "file_name": file_path.name,
+            "is_valid": False,
+            "error": None,
+            "file_type": "text",
+        }
+
+        text, success = self.extract_text_from_txt(file_path)
+        if success:
+            result["is_valid"] = True
+            self.logger.info("Valid text file: %s", file_path)
+        else:
+            result["error"] = "Text file content did not meet validation criteria"
+            self.logger.warning("Invalid text file: %s", file_path)
+
+        return result
+
+    def classify_image(self, file_path: Path) -> Dict[str, Any]:
+        """
+        Classify an image file by checking if it can be opened and is valid.
+
+        Args:
+            file_path (Path): Path to the image file.
+
+        Returns:
+            Dict[str, any]: Classification result with metadata.
+        """
+        result = {
+            "file_path": str(file_path),
+            "file_name": file_path.name,
+            "is_valid": False,
+            "error": None,
+            "file_type": "image",
+        }
+
+        try:
+            with Image.open(file_path) as img:
+                img.verify()  # Verifies that this is an image
+            result["is_valid"] = True
+            self.logger.info("Valid image file: %s", file_path)
+        except Exception as e:
+            result["error"] = f"Invalid image file: {e}"
+            self.logger.warning("Invalid image file: %s, error: %s", file_path, e)
+
+        return result
+
+    def classify_file(self, file_path: Path) -> Dict[str, Any]:
+        """
+        Determine the file type and classify accordingly.
+
+        Args:
+            file_path (Path): Path to the file.
+
+        Returns:
+            Dict[str, any]: Classification metadata dictionary.
+        """
+        ext = file_path.suffix.lower()
+        self.logger.debug("Classifying file: %s with extension %s", file_path, ext)
+
+        if ext == ".pdf":
+            return self.classify_pdf(file_path)
+        elif ext in self.TEXT_EXTENSIONS:
+            return self.classify_txt(file_path)
+        elif ext in self.IMAGE_EXTENSIONS:
+            return self.classify_image(file_path)
+        else:
+            self.logger.warning("Unsupported file type: %s", file_path)
+            return {
+                "file_path": str(file_path),
+                "file_name": file_path.name,
+                "is_valid": False,
+                "error": "Unsupported file type",
+                "file_type": "unknown",
+            }
+
     def process_directory(self) -> None:
         """
-        Process all PDFs in the input directory and save classification metadata.
+        Process all files in the input directory and save classification metadata.
         """
         metadata_file = self.metadata_dir / "classification_metadata.json"
         metadata = []
@@ -180,14 +296,14 @@ class PDFClassifier:
             self.logger.error("Input directory does not exist: %s", self.input_dir)
             raise FileNotFoundError(f"Input directory not found: {self.input_dir}")
 
-        pdf_files = [f for f in self.input_dir.glob("*.pdf")]
-        if not pdf_files:
-            self.logger.warning("No PDF files found in %s", self.input_dir)
+        files = [f for f in self.input_dir.iterdir() if f.is_file()]
+        if not files:
+            self.logger.warning("No files found in %s", self.input_dir)
             return
 
-        self.logger.info("Processing %d PDF files in %s", len(pdf_files), self.input_dir)
-        for file_path in pdf_files:
-            result = self.classify_pdf(file_path)
+        self.logger.info("Processing %d files in %s", len(files), self.input_dir)
+        for file_path in files:
+            result = self.classify_file(file_path)
             metadata.append(result)
 
         # Save metadata to JSON
@@ -218,11 +334,12 @@ class PDFClassifier:
             self.logger.error("Failed to load metadata: %s", str(e))
             return []
 
+
 if __name__ == "__main__":
     with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
     try:
-        classifier = PDFClassifier(
+        classifier = SourceClassifier(
             input_dir=config['files']['prefettura_v1'],
             metadata_dir=config['metadata']['directory'],
             min_text_length=100,
@@ -230,6 +347,6 @@ if __name__ == "__main__":
             language="it"
         )
         classifier.process_directory()
-        print("PDF classification completed.")
+        print("Source classification completed.")
     except Exception as e:
         print(f"Error during classification: {e}")
