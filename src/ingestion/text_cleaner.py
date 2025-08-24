@@ -2,9 +2,9 @@ import json
 import re
 from typing import Dict, List, Any
 from pathlib import Path
-import logging
 import yaml
 from src.utils.logging_utils import setup_logger
+
 
 class TextCleaner:
     """Cleans extracted text from PDFs for downstream processing."""
@@ -20,7 +20,7 @@ class TextCleaner:
 
         Args:
             input_dir (str): Directory containing extracted text files.
-            output_dir (str): Directory to save cleaned text and metadata.
+            output_dir (str): Directory to save cleaned text.
             min_text_length (int): Minimum character count for valid cleaned text.
         """
         self.input_dir = Path(input_dir)
@@ -37,7 +37,7 @@ class TextCleaner:
             r"\d{1,2}/\d{1,2}/\d{2,4}",  # e.g., "12/31/2023"
             r"\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?",  # e.g., "12:30", "12:30:45 PM"
         ]
-        self.special_char_pattern = r"[^\w\sàèìòùÀÈÌÒÙ]"  # Keep Italian diacritics
+        self.special_char_pattern = r"[^\w\sàèìòùÀÈÌÒÙ.,:-;'\"“”‘’()]"
 
     def clean_text(self, text: str) -> str:
         """
@@ -94,18 +94,17 @@ class TextCleaner:
 
     def process_file(self, file_path: Path) -> Dict[str, Any]:
         """
-        Process a single text file, clean it, and save results.
+        Process a single text file, clean it, and return metadata.
 
         Args:
             file_path (Path): Path to the input text file.
 
         Returns:
-            Dict[str, Any]: Cleaning result with text and metadata.
+            Dict[str, Any]: Metadata about cleaning result, without cleaned text.
         """
         result = {
             "file_path": str(file_path),
             "file_name": file_path.name,
-            "cleaned_text": "",
             "is_valid": False,
             "error": None,
             "original_length": 0,
@@ -121,16 +120,16 @@ class TextCleaner:
 
             # Clean text
             cleaned_text = self.clean_text(raw_text)
-            result["cleaned_text"] = cleaned_text
             result["cleaned_length"] = len(cleaned_text)
             result["is_valid"] = self.is_valid_text(cleaned_text)
 
             if not result["is_valid"]:
-                result["error"] = "Cleaned text is invalid (too short or lacks meaningful content)"
+                result["error"] = "Cleaned text seems invalid (too short or lacks meaningful content)"
                 self.logger.warning(result["error"])
 
-            # Save results
-            self.save_cleaned_text(result)
+            # Save cleaned text only (no metadata file)
+            self.save_cleaned_text(file_path.name, cleaned_text)
+
             return result
 
         except Exception as e:
@@ -138,46 +137,27 @@ class TextCleaner:
             result["error"] = str(e)
             return result
 
-    def save_cleaned_text(self, result: Dict[str, Any]) -> None:
+    def save_cleaned_text(self, file_name: str, cleaned_text: str) -> None:
         """
-        Save cleaned text and metadata to output directory.
+        Save cleaned text to output directory.
 
         Args:
-            result (Dict[str, Any]): Cleaning result with text and metadata.
+            file_name (str): Name of the original file.
+            cleaned_text (str): Cleaned text content to save.
         """
-        file_name = result["file_name"].rsplit(".", 1)[0]
-        text_file = self.output_dir / f"{file_name}.txt"
-        metadata_file = self.output_dir / f"{file_name}_metadata.json"
+        file_stem = file_name.rsplit(".", 1)[0]
+        text_file = self.output_dir / f"{file_stem}.txt"
 
-        # Save cleaned text
         try:
             with open(text_file, "w", encoding="utf-8") as f:
-                f.write(result["cleaned_text"])
+                f.write(cleaned_text)
             self.logger.info("Saved cleaned text to %s", text_file)
         except Exception as e:
             self.logger.error("Failed to save cleaned text to %s: %s", text_file, str(e))
-            result["error"] = str(e)
-
-        # Save metadata (excluding cleaned_text)
-        metadata = {
-            "file_path": result["file_path"],
-            "file_name": result["file_name"],
-            "is_valid": result["is_valid"],
-            "error": result["error"],
-            "original_length": result["original_length"],
-            "cleaned_length": result["cleaned_length"]
-        }
-        try:
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved cleaning metadata to %s", metadata_file)
-        except Exception as e:
-            self.logger.error("Failed to save metadata to %s: %s", metadata_file, str(e))
-            result["error"] = str(e)
 
     def process_directory(self) -> None:
         """
-        Process all text files in the input directory.
+        Process all text files in the input directory and save aggregated metadata.
         """
         text_files = list(self.input_dir.glob("*.txt"))
         if not text_files:
@@ -186,61 +166,31 @@ class TextCleaner:
 
         self.logger.info("Processing %d text files in %s", len(text_files), self.input_dir)
         processed_files = 0
-        results = []
+        metadata_collection = []
 
         for file_path in text_files:
-            result = self.process_file(file_path)
-            results.append(result)
+            metadata = self.process_file(file_path)
+            metadata_collection.append(metadata)
             processed_files += 1
 
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
 
-        # Save summary metadata
+        # Save all metadata in a single summary JSON file (without cleaned_text field)
         summary_file = self.output_dir / "cleaning_summary.json"
         try:
-            # Save metadata without cleaned_text
-            summary_metadata = [
-                {
-                    "file_path": r["file_path"],
-                    "file_name": r["file_name"],
-                    "is_valid": r["is_valid"],
-                    "error": r["error"],
-                    "original_length": r["original_length"],
-                    "cleaned_length": r["cleaned_length"]
-                }
-                for r in results
-            ]
             with open(summary_file, "w", encoding="utf-8") as f:
-                json.dump(summary_metadata, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved cleaning summary to %s", summary_file)
+                json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
+            self.logger.info("Saved cleaning summary metadata to %s", summary_file)
         except Exception as e:
-            self.logger.error("Failed to save cleaning summary: %s", str(e))
+            self.logger.error("Failed to save cleaning summary metadata: %s", str(e))
 
-    def get_cleaning_results(self) -> List[Dict[str, Any]]:
-        """
-        Load cleaning results from metadata files in output directory.
-
-        Returns:
-            List[Dict[str, Any]]: List of cleaning result dictionaries.
-        """
-        summary_file = self.output_dir / "cleaning_summary.json"
-        if not summary_file.exists():
-            self.logger.warning("Cleaning summary file not found: %s", summary_file)
-            return []
-
-        try:
-            with open(summary_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            self.logger.error("Failed to load cleaning summary: %s", str(e))
-            return []
 
 if __name__ == "__main__":
     with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
     try:
         cleaner = TextCleaner(
-            input_dir=config['texts']['prefettura_v1'],
+            input_dir='data/prefettura_v1.2_texts',
             output_dir=config['cleaned_texts']['prefettura_v1'],
             min_text_length=20
         )
