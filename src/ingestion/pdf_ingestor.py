@@ -1,75 +1,82 @@
 import json
-import os
 from typing import Dict, List, Optional, Tuple, Any
 import pdfplumber
 import pytesseract
 from PIL import Image, ImageEnhance
 from pdf2image import convert_from_path
 from pathlib import Path
+import os
+import fitz  # PyMuPDF
 import logging
 from src.utils.logging_utils import setup_logger
 import yaml
 
-class PDFIngestor:
-    """Extracts text from PDFs using pdfplumber or Tesseract based on classification."""
+
+class PyMuPDFImageOCR:
+    """Perform OCR on standalone image files using PyMuPDF's built-in OCR support."""
+
+    def __init__(self, tessdata_dir: Optional[str] = None, logger=None):
+        self.tessdata_dir = tessdata_dir
+        self.logger = logger or logging.getLogger("pymupdf_image_ocr")
+        if self.tessdata_dir:
+            os.environ["TESSDATA_PREFIX"] = self.tessdata_dir
+
+    def ocr_image_file(self, image_path: Path) -> str:
+        try:
+            pix = fitz.Pixmap(str(image_path))
+            doc = fitz.open()
+            page = doc.new_page(width=pix.width, height=pix.height)
+            page.insert_image(page.rect, pixmap=pix)
+
+            textpage = page.get_textpage_ocr(dpi=300, full=True)
+            text = page.get_text(textpage=textpage)
+
+            doc.close()
+            pix = None
+            return text
+        except Exception as e:
+            self.logger.error(f"OCR failed for image {image_path}: {e}")
+            return ""
+
+
+class TextIngestor:
+    """Extracts text from PDFs, text files, and images using appropriate methods."""
 
     def __init__(
         self,
         input_dir: str = "data/destination",
         metadata_path: str = "data/metadata_file.json",
         output_dir: str = "data/extracted_text",
+        output_metadata_file: str = "data/extracted_text/overall_metadata.json",
         max_pages: Optional[int] = None,
-        language: str = "it",
+        language: str = "ita",
+        tessdata_dir: Optional[str] = None,
     ):
-        """
-        Initialize PDFIngestor with configuration parameters.
-
-        Args:
-            input_dir (str): Directory containing PDFs to process.
-            metadata_path (str): Path to the file containing classification metadata.
-            output_dir (str): Directory to save extracted text files.
-            max_pages (Optional[int]): Maximum pages to process per PDF (default: all).
-            language (str): Language code for Tesseract OCR (e.g., 'it' for Italian).
-        """
         self.input_dir = Path(input_dir)
         self.metadata_path = Path(metadata_path)
         self.output_dir = Path(output_dir)
+        self.output_metadata_file = Path(output_metadata_file)
         self.max_pages = max_pages
         self.language = language
-        self.logger = setup_logger("pdf_ingestor")
+        self.logger = setup_logger("text_ingestor")
 
-        # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Initialize PyMuPDFImageOCR helper for image OCR
+        self.image_ocr = PyMuPDFImageOCR(tessdata_dir=tessdata_dir, logger=self.logger)
+
     def load_classification_metadata(self) -> List[Dict[str, Any]]:
-        """
-        Load classification metadata from JSON file.
-
-        Returns:
-            List[Dict[str, Any]]: List of classification result dictionaries.
-        """
-        metadata_file = self.metadata_path
-        if not metadata_file.exists():
-            self.logger.error("Metadata file not found: %s", metadata_file)
-            raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
-
+        if not self.metadata_path.exists():
+            self.logger.error("Metadata file not found: %s", self.metadata_path)
+            raise FileNotFoundError(f"Metadata file not found: {self.metadata_path}")
         try:
-            with open(metadata_file, "r", encoding="utf-8") as f:
+            with open(self.metadata_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            self.logger.error("Failed to load metadata: %s", str(e))
+            self.logger.error("Failed to load metadata: %s", e)
             raise
 
     def extract_text_with_pdfplumber(self, file_path: Path) -> Tuple[str, List[Dict], bool]:
-        """
-        Extract text from a text-based PDF using pdfplumber.
-
-        Args:
-            file_path (Path): Path to the PDF file.
-
-        Returns:
-            Tuple[str, List[Dict], bool]: Extracted text, page metadata, and success flag.
-        """
         text = ""
         page_metadata = []
         try:
@@ -96,19 +103,10 @@ class PDFIngestor:
                 success = len(text.strip()) > 0
                 return text, page_metadata, success
         except Exception as e:
-            self.logger.error("pdfplumber extraction failed for %s: %s", file_path, str(e))
+            self.logger.error("pdfplumber extraction failed for %s: %s", file_path, e)
             return "", [{"page_number": 0, "error": str(e)}], False
 
     def extract_text_with_ocr(self, file_path: Path) -> Tuple[str, List[Dict], bool]:
-        """
-        Extract text from an image-based PDF using Tesseract OCR.
-
-        Args:
-            file_path (Path): Path to the PDF file.
-
-        Returns:
-            Tuple[str, List[Dict], bool]: Extracted text, page metadata, and success flag.
-        """
         text = ""
         page_metadata = []
         try:
@@ -122,9 +120,8 @@ class PDFIngestor:
             self.logger.info("Extracting text from %d pages with Tesseract OCR", pages_to_read)
             for i, image in enumerate(images):
                 self.logger.debug("Running Tesseract OCR on page %d", i + 1)
-                # Enhance contrast
                 image = ImageEnhance.Contrast(image).enhance(2.0)
-                page_text = pytesseract.image_to_string(image, lang="ita")
+                page_text = pytesseract.image_to_string(image, lang=self.language)
                 text += page_text + "\n"
                 page_metadata.append({
                     "page_number": i + 1,
@@ -134,142 +131,165 @@ class PDFIngestor:
             success = len(text.strip()) > 0
             return text, page_metadata, success
         except Exception as e:
-            self.logger.error("Tesseract OCR extraction failed for %s: %s", file_path, str(e))
+            self.logger.error("Tesseract OCR extraction failed for %s: %s", file_path, e)
             return "", [{"page_number": 0, "error": str(e)}], False
 
-    def extract_text(self, file_path: Path, pdf_type: str) -> Dict[str, Any]:
-        """
-        Extract text from a PDF based on its classification.
+    def extract_text_from_txt(self, file_path: Path) -> Tuple[str, List[Dict], bool]:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                text = f.read()
+            page_metadata = [{
+                "page_number": 1,
+                "text_length": len(text),
+                "source": "text_file"
+            }]
+            success = len(text.strip()) > 0
+            return text, page_metadata, success
+        except Exception as e:
+            self.logger.error("Failed to read text file %s: %s", file_path, e)
+            return "", [{"page_number": 0, "error": str(e)}], False
 
-        Args:
-            file_path (Path): Path to the PDF file.
-            pdf_type (str): PDF type ('text-based', 'image-based', 'unknown').
-
-        Returns:
-            Dict[str, Any]: Extraction result with text and metadata.
-        """
+    def extract_text(self, file_path: Path, file_type: str) -> Dict[str, Any]:
         result = {
             "file_path": str(file_path),
             "file_name": file_path.name,
-            "pdf_type": pdf_type,
+            "file_type": file_type,
             "text": "",
             "page_metadata": [],
             "is_valid": False,
             "error": None
         }
 
-        self.logger.info("Extracting text from %s (type: %s)", file_path, pdf_type)
-        if pdf_type == "text-based":
-            text, page_metadata, success = self.extract_text_with_pdfplumber(file_path)
-        elif pdf_type == "image-based":
-            text, page_metadata, success = self.extract_text_with_ocr(file_path)
-        else:
-            result["error"] = f"Unknown PDF type: {pdf_type}"
-            self.logger.error(result["error"])
-            return result
+        self.logger.info("Extracting text from %s (type: %s)", file_path, file_type)
 
-        result["text"] = text
-        result["page_metadata"] = page_metadata
-        result["is_valid"] = success
-        if not success:
-            result["error"] = "No valid text extracted"
-            self.logger.warning("Text extraction failed for %s", file_path)
+        if file_type == "pdf":
+            try:
+                metadata_list = self.load_classification_metadata()
+                matching_meta = next((m for m in metadata_list if m["file_name"] == file_path.name), None)
+                pdf_type = matching_meta.get("pdf_type", "unknown") if matching_meta else "unknown"
+            except Exception as e:
+                self.logger.warning("Failed to get pdf_type from metadata: %s", e)
+                pdf_type = "unknown"
+
+            if pdf_type == "text-based":
+                text, page_metadata, success = self.extract_text_with_pdfplumber(file_path)
+            elif pdf_type == "image-based":
+                text, page_metadata, success = self.extract_text_with_ocr(file_path)
+            else:
+                result["error"] = f"Unknown PDF type: {pdf_type}"
+                self.logger.error(result["error"])
+                return result
+
+            result["text"] = text
+            result["page_metadata"] = page_metadata
+            result["is_valid"] = success
+            if not success:
+                result["error"] = "No valid text extracted from PDF"
+
+        elif file_type == "text":
+            text, page_metadata, success = self.extract_text_from_txt(file_path)
+            result["text"] = text
+            result["page_metadata"] = page_metadata
+            result["is_valid"] = success
+            if not success:
+                result["error"] = "No valid text extracted from text file"
+
+        elif file_type == "image":
+            text = self.image_ocr.ocr_image_file(file_path)
+            is_valid = bool(text.strip())
+            result["text"] = text
+            result["page_metadata"] = [{"page_number": 1, "text_length": len(text), "source": "pymupdf_ocr"}]
+            result["is_valid"] = is_valid
+            if not is_valid:
+                result["error"] = "No valid text extracted from image file"
+            self.logger.info(f"Extracted text from image file: {file_path} valid: {is_valid}")
+
+        else:
+            result["text"] = ""
+            result["page_metadata"] = []
+            result["is_valid"] = False
+            result["error"] = f"Unsupported file type: {file_type}"
+            self.logger.warning(f"Unsupported file type: {file_type}")
 
         return result
 
-    def save_extracted_text(self, result: Dict[str, Any]) -> None:
-        """
-        Save extracted text and metadata to output directory.
+    def save_extracted_metadata(self, all_metadata: List[Dict[str, Any]]) -> None:
+        try:
+            with open(self.output_metadata_file, "w", encoding="utf-8") as f:
+                json.dump(all_metadata, f, ensure_ascii=False, indent=2)
+            self.logger.info(f"Saved aggregated extraction metadata to {self.output_metadata_file}")
+        except Exception as e:
+            self.logger.error(f"Failed to save aggregated metadata to {self.output_metadata_file}: {e}")
+            raise
 
-        Args:
-            result (Dict[str, Any]): Extraction result with text and metadata.
-        """
-        file_name = result["file_name"].rsplit(".", 1)[0]
+    def save_extracted_text(self, file_name: str, text: str) -> None:
         text_file = self.output_dir / f"{file_name}.txt"
-        metadata_file = self.output_dir / f"{file_name}_metadata.json"
-
-        # Save text
         try:
             with open(text_file, "w", encoding="utf-8") as f:
-                f.write(result["text"])
-            self.logger.info("Saved extracted text to %s", text_file)
+                f.write(text)
+            self.logger.info(f"Saved extracted text to {text_file}")
         except Exception as e:
-            self.logger.error("Failed to save text to %s: %s", text_file, str(e))
-            result["error"] = str(e)
-
-        # Save metadata (excluding text)
-        metadata = {
-            "file_path": result["file_path"],
-            "file_name": result["file_name"],
-            "pdf_type": result["pdf_type"],
-            "page_metadata": result["page_metadata"],
-            "is_valid": result["is_valid"],
-            "error": result["error"]
-        }
-        try:
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved extraction metadata to %s", metadata_file)
-        except Exception as e:
-            self.logger.error("Failed to save metadata to %s: %s", metadata_file, str(e))
-            result["error"] = str(e)
+            self.logger.error(f"Failed to save text to {text_file}: {e}")
 
     def process_directory(self) -> None:
-        """
-        Process all PDFs in the input directory based on classification metadata.
-        """
         metadata = self.load_classification_metadata()
         if not metadata:
             self.logger.warning("No classification metadata found. Skipping processing.")
             return
 
-        pdf_files = {m["file_name"]: m for m in metadata}
+        files_metadata = {m["file_name"]: m for m in metadata}
         processed_files = 0
+        aggregated_metadata = []
 
-        for file_name, classification in pdf_files.items():
+        for file_name, classification in files_metadata.items():
             file_path = self.input_dir / file_name
             if not file_path.exists():
-                self.logger.warning("PDF file not found: %s", file_path)
+                self.logger.warning(f"File not found: {file_path}")
+                aggregated_metadata.append({
+                    "file_path": str(file_path),
+                    "file_name": file_name,
+                    "file_type": classification.get("file_type", "unknown"),
+                    "text": "",
+                    "page_metadata": [],
+                    "is_valid": False,
+                    "error": "File missing"
+                })
                 continue
 
-            if not classification["is_valid"]:
-                self.logger.warning("Skipping invalid PDF: %s (%s)", file_name, classification.get("error", "Unknown error"))
-                continue
+            result = self.extract_text(file_path, classification.get("file_type", "unknown"))
+            file_base_name = file_name.rsplit(".", 1)[0]
+            if result["text"]:
+                self.save_extracted_text(file_base_name, result["text"])
+            else:
+                self.logger.info(f"No text extracted to save for file: {file_name}")
 
-            result = self.extract_text(file_path, classification["pdf_type"])
-            self.save_extracted_text(result)
+            meta_entry = {
+                "file_path": result["file_path"],
+                "file_name": result["file_name"],
+                "file_type": result.get("file_type", "unknown"),
+                "page_metadata": result["page_metadata"],
+                "is_valid": result["is_valid"],
+                "error": result["error"]
+            }
+            aggregated_metadata.append(meta_entry)
             processed_files += 1
 
-        self.logger.info("Processed %d/%d PDF files", processed_files, len(pdf_files))
+        self.save_extracted_metadata(aggregated_metadata)
+        self.logger.info(f"Processed {processed_files}/{len(files_metadata)} files")
 
-    def get_extraction_results(self) -> List[Dict[str, Any]]:
-        """
-        Load extraction results from metadata files in output directory.
-
-        Returns:
-            List[Dict[str, Any]]: List of extraction result dictionaries.
-        """
-        results = []
-        for metadata_file in self.output_dir.glob("*_metadata.json"):
-            try:
-                with open(metadata_file, "r", encoding="utf-8") as f:
-                    results.append(json.load(f))
-            except Exception as e:
-                self.logger.error("Failed to load metadata: %s", str(e))
-        return results
 
 if __name__ == "__main__":
     with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
-    try:
-        ingestor = PDFIngestor(
-            input_dir=config['files']['prefettura_v1'],
-            metadata_path=config['metadata']['prefettura_v1'],
-            output_dir=config['texts']['prefettura_v1'],
-            max_pages=None,
-            language="it"
-        )
-        ingestor.process_directory()
-        print("Text extraction completed. Results saved to data/extracted_text")
-    except Exception as e:
-        print(f"Error during text extraction: {e}")
+
+    ingestor = TextIngestor(
+        input_dir=config['files']['prefettura_v1'],
+        metadata_path=config['metadata']['classification_prefettura_v1'],
+        output_dir=config['texts']['prefettura_v1'],
+        output_metadata_file=config['metadata'].get('extraction_prefettura_v1.2', 'data/metadata/extraction_prefettura_v1.2.json'),
+        max_pages=None,
+        language="ita",
+        tessdata_dir=r"C:\Program Files\Tesseract-OCR\tessdata"  # adjust as needed
+    )
+    ingestor.process_directory()
+    print("Text extraction completed. Aggregated metadata saved.")
