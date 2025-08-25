@@ -141,7 +141,6 @@ class TextChunker:
 
         self.logger.info("Chunking text file: %s", file_path)
         try:
-            # Read text file
             with open(file_path, "r", encoding="utf-8") as f:
                 text = f.read()
             result["original_length"] = len(text)
@@ -157,8 +156,8 @@ class TextChunker:
                 result["error"] = "No valid chunks created (too short or lacks meaningful content)"
                 self.logger.warning(result["error"])
 
-            # Save results
-            self.save_chunks(result)
+            # Save each chunk (no per-file metadata any longer)
+            self.save_chunks(file_path.name, chunks)
             return result
 
         except Exception as e:
@@ -166,56 +165,27 @@ class TextChunker:
             result["error"] = str(e)
             return result
 
-    def save_chunks(self, result: Dict[str, Any]) -> None:
+    def save_chunks(self, file_name: str, chunks: List[Dict[str, Any]]) -> None:
         """
-        Save chunks and metadata to output directory.
+        Save each chunk's text to output directory, no metadata per chunk.
 
         Args:
-            result (Dict[str, Any]): Chunking result with chunks and metadata.
+            file_name (str): Name of original file.
+            chunks (List[Dict[str, Any]]): Chunk dictionary list.
         """
-        file_name = result["file_name"].rsplit(".", 1)[0]
-        metadata_file = self.output_dir / f"{file_name}_metadata.json"
-
-        # Save chunks
-        for i, chunk in enumerate(result["chunks"], 1):
-            chunk_file = self.output_dir / f"{file_name}_chunk_{i:03d}.txt"
+        file_stem = file_name.rsplit(".", 1)[0]
+        for i, chunk in enumerate(chunks, 1):
+            chunk_file = self.output_dir / f"{file_stem}_chunk_{i:03d}.txt"
             try:
                 with open(chunk_file, "w", encoding="utf-8") as f:
                     f.write(chunk["text"])
                 self.logger.info("Saved chunk to %s", chunk_file)
             except Exception as e:
                 self.logger.error("Failed to save chunk to %s: %s", chunk_file, str(e))
-                result["error"] = str(e)
-
-        # Save metadata (excluding chunk text)
-        metadata = {
-            "file_path": result["file_path"],
-            "file_name": result["file_name"],
-            "is_valid": result["is_valid"],
-            "error": result["error"],
-            "original_length": result["original_length"],
-            "chunk_count": result["chunk_count"],
-            "chunks_metadata": [
-                {
-                    "chunk_id": f"{file_name}_chunk_{i:03d}",
-                    "word_count": chunk["word_count"],
-                    "char_length": chunk["char_length"],
-                    "is_valid": chunk["is_valid"]
-                }
-                for i, chunk in enumerate(result["chunks"], 1)
-            ]
-        }
-        try:
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved chunking metadata to %s", metadata_file)
-        except Exception as e:
-            self.logger.error("Failed to save metadata to %s: %s", metadata_file, str(e))
-            result["error"] = str(e)
 
     def process_directory(self) -> None:
         """
-        Process all text files in the input directory.
+        Process all text files in the input directory and save accumulated metadata once.
         """
         text_files = list(self.input_dir.glob("*.txt"))
         if not text_files:
@@ -224,52 +194,50 @@ class TextChunker:
 
         self.logger.info("Processing %d text files in %s", len(text_files), self.input_dir)
         processed_files = 0
-        results = []
+        metadata_collection = []
 
         for file_path in text_files:
             result = self.process_file(file_path)
-            results.append(result)
+            # Record only the metadata, with chunk text excluded
+            file_metadata = {
+                "file_path": result["file_path"],
+                "file_name": result["file_name"],
+                "is_valid": result["is_valid"],
+                "error": result["error"],
+                "original_length": result["original_length"],
+                "chunk_count": result["chunk_count"],
+                "chunks_metadata": [
+                    {
+                        "chunk_id": f"{result['file_name'].rsplit('.', 1)[0]}_chunk_{i:03d}",
+                        "word_count": chunk["word_count"],
+                        "char_length": chunk["char_length"],
+                        "is_valid": chunk["is_valid"]
+                    }
+                    for i, chunk in enumerate(result["chunks"], 1)
+                ]
+            }
+            metadata_collection.append(file_metadata)
             processed_files += 1
 
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
 
-        # Save summary metadata
+        # Save all metadata in a single summary JSON file
         summary_file = self.output_dir / "chunking_summary.json"
         try:
-            # Save metadata without chunk text
-            summary_metadata = [
-                {
-                    "file_path": r["file_path"],
-                    "file_name": r["file_name"],
-                    "is_valid": r["is_valid"],
-                    "error": r["error"],
-                    "original_length": r["original_length"],
-                    "chunk_count": r["chunk_count"],
-                    "chunks_metadata": [
-                        {
-                            "chunk_id": f"{r['file_name'].rsplit('.', 1)[0]}_chunk_{i:03d}",
-                            "word_count": chunk["word_count"],
-                            "char_length": chunk["char_length"],
-                            "is_valid": chunk["is_valid"]
-                        }
-                        for i, chunk in enumerate(r["chunks"], 1)
-                    ]
-                }
-                for r in results
-            ]
             with open(summary_file, "w", encoding="utf-8") as f:
-                json.dump(summary_metadata, f, ensure_ascii=False, indent=2)
+                json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
             self.logger.info("Saved chunking summary to %s", summary_file)
         except Exception as e:
             self.logger.error("Failed to save chunking summary: %s", str(e))
+
 
 if __name__ == "__main__":
     with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
     try:
         chunker = TextChunker(
-            input_dir=config['cleaned_texts']['prefettura_v1'],
-            output_dir=config['chunks']['prefettura_v1'],
+            input_dir=config['cleaned_texts'].get('prefettura_v1.2', 'data/prefettura_v1.2_cleaned_texts'),
+            output_dir=config['chunks'].get('prefettura_v1.2', 'data/chunks/prefettura_v1.2_chunks'),
             max_chunk_words=500,
             min_chunk_length=10
         )
