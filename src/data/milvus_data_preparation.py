@@ -1,6 +1,8 @@
 from pymilvus import model
 from pathlib import Path
 from typing import List
+from pymilvus import MilvusClient
+
 
 def read_texts_from_directory(directory_path: str) -> List[str]:
     """
@@ -33,17 +35,30 @@ if __name__ == "__main__":
 
     docs = read_texts_from_directory("data/prefettura_v1.2.cleaned_texts")
 
-vectors = embedding_fn.encode_documents(docs)
+    vectors = embedding_fn.encode_documents(docs)
 
-# The output vector has 768 dimensions, matching the collection that we just created.
-print("Dim:", embedding_fn.dim, vectors[0].shape)  # Dim: 768 (768,)
+    # The output vector has 768 dimensions, matching the collection that we just created.
+    print("Dim:", embedding_fn.dim, vectors[0].shape)  # Dim: 768 (768,)
 
-# Each entity has id, vector representation, raw text, and a subject label that we use
-# to demo metadata filtering later.
-data = [
-    {"id": i, "vector": vectors[i], "text": docs[i], "subject": "courthouse"}
-    for i in range(len(vectors))
-]
+    # Each entity has id, vector representation, raw text, and a subject label that we use
+    # to demo metadata filtering later.
+    data = [
+        {"id": i, "vector": vectors[i], "text": docs[i], "subject": "courthouse"}
+        for i in range(len(vectors))
+    ]
 
-print("Data has", len(data), "entities, each with fields: ", data[0].keys())
-print("Vector dim:", len(data[0]["vector"]))
+    print("Data has", len(data), "entities, each with fields: ", data[0].keys())
+    print("Vector dim:", len(data[0]["vector"]))
+
+    client = MilvusClient("gotmat_client.db")
+
+    if client.has_collection(collection_name="gotmat_collection"):
+        client.drop_collection(collection_name="gotmat_collection")
+    client.create_collection(
+        collection_name="gotmat_collection",
+        dimension=768,  # Check your case
+    )
+
+    res = client.insert(collection_name="demo_collection", data=data)
+
+    print(res)
