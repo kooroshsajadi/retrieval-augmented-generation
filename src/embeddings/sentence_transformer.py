@@ -1,7 +1,6 @@
 import json
 from typing import Dict, List, Any
 from pathlib import Path
-import logging
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import yaml
@@ -14,6 +13,7 @@ class EmbeddingGenerator:
         self,
         input_dir: str = "data/chunked_text",
         output_dir: str = "data/embeddings",
+        chunking_info_path: str = "data/metadata/chunking_prefettura_v1.2.json",
         model_name: str = "intfloat/multilingual-e5-large",
     ):
         """
@@ -26,6 +26,7 @@ class EmbeddingGenerator:
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
+        self.chunking_info_path = Path(chunking_info_path)
         self.model_name = model_name
         self.logger = setup_logger("sentence_transformer")
 
@@ -43,13 +44,13 @@ class EmbeddingGenerator:
         Returns:
             List[Dict[str, Any]]: List of chunking result dictionaries.
         """
-        summary_file = self.input_dir / "chunking_summary.json"
-        if not summary_file.exists():
-            self.logger.error("Chunking summary file not found: %s", summary_file)
-            raise FileNotFoundError(f"Chunking summary file not found: {summary_file}")
+
+        if not self.chunking_info_path.exists():
+            self.logger.error("Chunking summary file not found: %s", self.chunking_info_path)
+            raise FileNotFoundError(f"Chunking summary file not found: {self.chunking_info_path}")
 
         try:
-            with open(summary_file, "r", encoding="utf-8") as f:
+            with open(self.chunking_info_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             self.logger.error("Failed to load chunking summary: %s", str(e))
@@ -69,6 +70,7 @@ class EmbeddingGenerator:
             embedding = self.model.encode(text, normalize_embeddings=True)
             self.logger.debug("Generated embedding for text (length: %d)", len(text))
             return embedding
+        
         except Exception as e:
             self.logger.error("Embedding generation failed: %s", str(e))
             return np.array([])
@@ -111,15 +113,7 @@ class EmbeddingGenerator:
                     self.logger.warning("Empty embedding for chunk: %s", chunk_meta["chunk_id"])
                     continue
 
-                result["chunk_embeddings"].append({
-                    "chunk_id": chunk_meta["chunk_id"],
-                    "word_count": chunk_meta["word_count"],
-                    "char_length": chunk_meta["char_length"],
-                    "embedding_file": f"{chunk_meta['chunk_id']}.npy",
-                    "is_valid": True
-                })
-
-                # Save embedding
+                # Save embedding file
                 embedding_file = self.output_dir / f"{chunk_meta['chunk_id']}.npy"
                 try:
                     np.save(embedding_file, embedding)
@@ -128,13 +122,20 @@ class EmbeddingGenerator:
                     self.logger.error("Failed to save embedding to %s: %s", embedding_file, str(e))
                     result["error"] = str(e)
 
+                # Accumulate minimal metadata (no embedding itself)
+                result["chunk_embeddings"].append({
+                    "chunk_id": chunk_meta["chunk_id"],
+                    "word_count": chunk_meta["word_count"],
+                    "char_length": chunk_meta["char_length"],
+                    "embedding_file": f"{chunk_meta['chunk_id']}.npy",
+                    "is_valid": True
+                })
+
             result["is_valid"] = len(result["chunk_embeddings"]) > 0
             if not result["is_valid"]:
                 result["error"] = "No valid embeddings generated"
                 self.logger.warning(result["error"])
 
-            # Save metadata
-            self.save_metadata(result)
             return result
 
         except Exception as e:
@@ -142,26 +143,10 @@ class EmbeddingGenerator:
             result["error"] = str(e)
             return result
 
-    def save_metadata(self, result: Dict[str, Any]) -> None:
-        """
-        Save embedding metadata to output directory.
-
-        Args:
-            result (Dict[str, Any]): Embedding result with metadata.
-        """
-        file_name = result["file_name"].rsplit(".", 1)[0]
-        metadata_file = self.output_dir / f"{file_name}_metadata.json"
-        try:
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved embedding metadata to %s", metadata_file)
-        except Exception as e:
-            self.logger.error("Failed to save metadata to %s: %s", metadata_file, str(e))
-            result["error"] = str(e)
-
     def process_directory(self) -> None:
         """
         Process all chunked files in the input directory.
+        Save all metadata in a single summary file.
         """
         metadata = self.load_chunk_metadata()
         if not metadata:
@@ -182,7 +167,7 @@ class EmbeddingGenerator:
 
         self.logger.info("Processed %d/%d files", processed_files, len(metadata))
 
-        # Save summary metadata
+        # Save all metadata in a single summary file
         summary_file = self.output_dir / "embeddings_summary.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
@@ -215,8 +200,9 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks']['prefettura_v1'],
-            output_dir=config['embeddings']['prefettura_v1'],
+            input_dir=config['chunks'].get('prefettura_v1.2', 'data/chunks/prefettura_v1.2_chunks'),
+            output_dir=config['embeddings'].get('prefettura_v1.2', 'data/embeddings/prefettura_v1.2_embeddings'),
+            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.2', 'data/metadata/chunking_prefettura_v1.2.json'),
             model_name=config.get('embedding_model', 'intfloat/multilingual-e5-large')
         )
         generator.process_directory()
