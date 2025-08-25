@@ -264,25 +264,6 @@ class TextChunker:
         except Exception as e:
             self.logger.error("Failed to save chunking summary: %s", str(e))
 
-    def get_chunking_results(self) -> List[Dict[str, Any]]:
-        """
-        Load chunking results from summary file.
-
-        Returns:
-            List[Dict[str, Any]]: List of chunking result dictionaries.
-        """
-        summary_file = self.output_dir / "chunking_summary.json"
-        if not summary_file.exists():
-            self.logger.warning("Chunking summary file not found: %s", summary_file)
-            return []
-
-        try:
-            with open(summary_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            self.logger.error("Failed to load chunking summary: %s", str(e))
-            return []
-
 if __name__ == "__main__":
     with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
