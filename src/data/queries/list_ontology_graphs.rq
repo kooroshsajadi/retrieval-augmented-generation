@@ -1,0 +1,14 @@
+##
+# Query Name: list_ontology_graphs
+# Purpose: Retrieve all named graphs (contexts) in the repository whose URI includes the substring "ontology".
+# Context: Applies to any RDF triple store where ontologies are in named graphs with 'ontology' in the URI.
+# Returns: ?g (IRI of each ontology graph)
+# Usage: Use to enumerate and audit all ontology graphs for discovery or scripting.
+##
+
+SELECT DISTINCT ?g
+WHERE {
+  GRAPH ?g { ?s ?p ?o }
+  FILTER(CONTAINS(STR(?g), "ontology"))
+}
+ORDER BY ?g
