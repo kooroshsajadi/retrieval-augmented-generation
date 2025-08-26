@@ -2,6 +2,7 @@ from pymilvus import model
 from pathlib import Path
 from typing import List
 from pymilvus import MilvusClient
+import numpy as np
 
 
 def read_texts_from_directory(directory_path: str) -> List[str]:
@@ -33,12 +34,16 @@ if __name__ == "__main__":
     # This will download a small embedding model "paraphrase-albert-small-v2" (~50MB).
     embedding_fn = model.DefaultEmbeddingFunction()
 
-    docs = read_texts_from_directory("data/prefettura_v1.2.cleaned_texts")
+    docs = read_texts_from_directory("data/prefettura_v1.2_cleaned_texts")
+
+    print("Read", len(docs), "documents")
 
     vectors = embedding_fn.encode_documents(docs)
 
+    vectors_list = np.array(vectors)
+
     # The output vector has 768 dimensions, matching the collection that we just created.
-    print("Dim:", embedding_fn.dim, vectors[0].shape)  # Dim: 768 (768,)
+    print("Dim:", embedding_fn.dim, vectors_list[0].shape)  # Dim: 768 (768,)
 
     # Each entity has id, vector representation, raw text, and a subject label that we use
     # to demo metadata filtering later.
