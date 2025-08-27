@@ -20,7 +20,7 @@ Each script in this project is designed to be run as a module using Python's `-m
 ```
 python -m src.ingestion.text_ingestor
 ```
-Replace the above mentioned script path with your desired path.
+Replace the above mentioned script path with your desired path and run your command from the project root directory.
 
 ## 📚 Data Sources
 
