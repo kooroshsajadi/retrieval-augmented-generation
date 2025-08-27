@@ -13,6 +13,15 @@ This project implements a Retrieval-Augmented Generation (RAG) pipeline for proc
 
 Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
 
+## 🚀 How to Run the Scripts in the Repository
+
+Each script in this project is designed to be run as a module using Python's `-m` flag from the root directory of the repository. This ensures proper handling of relative imports in our modular codebase. An example is mentioned below:
+
+```
+python -m src.ingestion.text_ingestor
+```
+Replace the above mentioned script path with your desired path.
+
 ## 📚 Data Sources
 
 - **Knowledge Graph of the Italian Legislation**
