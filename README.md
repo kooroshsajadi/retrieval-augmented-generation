@@ -17,6 +17,15 @@ Proper code is embedded in each script and execution logs for each is saved to `
 
 - **Knowledge Graph of the Italian Legislation**
   - Colombo, A. (2024). Knowledge Graph of the Italian Legislation [Data set]. Zenodo. DOI: 10.5281/zenodo.13798158
+ 
+### 🚀 How to Run Scripts
+
+Each script in this project is designed to be run as a module using Python's `-m` flag from the root directory of the repository. This ensures proper handling of relative imports in our modular codebase. An example is mentioned below:
+
+```
+python -m src.ingestion.text_ingestor
+```
+Replace the above mentioned script path with your desired path.
 
 ## 📄 License
 
