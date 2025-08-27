@@ -5,7 +5,7 @@ This project implements a Retrieval-Augmented Generation (RAG) pipeline for proc
 ## 🗄️ Data Ingestion (Data Layer)
 
 - [**file_classifier.py**](./src/ingestion/file_classifier.py): Classifies PDFs as text-based or image-based using `pdfplumber` and saves the result as metadata for later usage.
-- [**text_ingestor.py**](./src/ingestion/text_ingestor.py): Extracts text from files using `pdfplumber` (text-based), `Tesseract OCR` (image-based, `lang="ita"`), and PyMuPDF (images).
+- [**text_ingestor.py**](./src/ingestion/text_ingestor.py): Extracts text from files using `pdfplumber` (text-based), `Tesseract OCR` (image-based, `lang="ita"`), and `PyMuPDF` (images).
 - [**text_cleaner.py**](./src/ingestion/text_cleaner.py): Cleans the extracted text.
 - [**text_chunker.py**](./src/ingestion/text_chunker.py): Splits cleaned text into sentence-based chunks.
 
