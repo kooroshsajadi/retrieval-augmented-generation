@@ -4,14 +4,19 @@ This project implements a Retrieval-Augmented Generation (RAG) pipeline for proc
 
 ## 🗄️ Data Ingestion (Data Layer)
 
-- **pdf_classifier.py**: Classifies PDFs as text-based or image-based using `pdfplumber` and saves the result as metadata for later usage.
-- **pdf_ingestor.py**: Extracts text from PDFs using `pdfplumber` (text-based) or `Tesseract OCR` (image-based, `lang="it"`).
-- **text_cleaner.py**: Cleans extracted text.
-- **text_chunker.py**: Splits cleaned text into sentence-based chunks.
+- [**file_classifier.py**](./src/ingestion/file_classifier.py): Classifies PDFs as text-based or image-based using `pdfplumber` and saves the result as metadata for later usage.
+- [**text_ingestor.py**](./src/ingestion/text_ingestor.py): Extracts text from files using `pdfplumber` (text-based), `Tesseract OCR` (image-based, `lang="ita"`), and `PyMuPDF` (images).
+- [**text_cleaner.py**](./src/ingestion/text_cleaner.py): Cleans the extracted text.
+- [**text_chunker.py**](./src/ingestion/text_chunker.py): Splits cleaned text into sentence-based chunks.
 
 ## 📝 Logging
 
 Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
+
+## 📚 Data Sources
+
+- **Knowledge Graph of the Italian Legislation**
+  - Colombo, A. (2024). Knowledge Graph of the Italian Legislation [Data set]. Zenodo. DOI: 10.5281/zenodo.13798158
 
 ## 📄 License
 
