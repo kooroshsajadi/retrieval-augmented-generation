@@ -340,8 +340,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         classifier = SourceClassifier(
-            input_dir=config['files']['prefettura_v1'],
-            metadata_dir=config['metadata']['directory'],
+            input_dir=config['files']['prefettura_v1'], # Replace with your actual local address to the dataset.
+            metadata_dir=config['metadata']['directory'], # Replace with your desired local address to save the metadata.
             min_text_length=100,
             ocr_sample_pages=1,
             language="it"

@@ -283,13 +283,13 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
 
     ingestor = TextIngestor(
-        input_dir=config['files']['prefettura_v1'],
-        metadata_path=config['metadata']['classification_prefettura_v1'],
-        output_dir=config['texts']['prefettura_v1'],
-        output_metadata_file=config['metadata'].get('extraction_prefettura_v1.2', 'data/metadata/extraction_prefettura_v1.2.json'),
+        input_dir=config['files']['prefettura_v1'], # Replace with your actual local address to the dataset.
+        metadata_path=config['metadata']['classification_prefettura_v1'], # Replace with your local address to load the classification metadata.
+        output_dir=config['texts']['prefettura_v1'], # Replace with you desired local address to save the extracted text.
+        output_metadata_file=config['metadata'].get('extraction_prefettura_v1.2', 'data/metadata/extraction_prefettura_v1.2.json'), # Replace with your desired local address to save the extraction metadata.
         max_pages=None,
         language="ita",
-        tessdata_dir=r"C:\Program Files\Tesseract-OCR\tessdata"  # adjust as needed
+        tessdata_dir=r"C:\Program Files\Tesseract-OCR\tessdata"  # adjust as needed.
     )
     ingestor.process_directory()
     print("Text extraction completed. Aggregated metadata saved.")
