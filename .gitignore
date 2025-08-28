@@ -3,3 +3,5 @@ __pycache__
 /data
 logs
 config.yaml
+volumes
+docker*
