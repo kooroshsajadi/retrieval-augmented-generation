@@ -2,12 +2,20 @@
 
 This project implements a Retrieval-Augmented Generation (RAG) pipeline for processing Italian PDFs, extracting text, and preparing data for GraphDB/Neo4j integration. Licensed under the Apache License 2.0.
 
-## 🗄️ Data Ingestion (Data Layer)
+## 📦 Data Layer
+
+### 🚛 Data Ingestion
 
 - [**file_classifier.py**](./src/ingestion/file_classifier.py): Classifies PDFs as text-based or image-based using `pdfplumber` and saves the result as metadata for later usage.
 - [**text_ingestor.py**](./src/ingestion/text_ingestor.py): Extracts text from files using `pdfplumber` (text-based), `Tesseract OCR` (image-based, `lang="ita"`), and `PyMuPDF` (images).
 - [**text_cleaner.py**](./src/ingestion/text_cleaner.py): Cleans the extracted text.
 - [**text_chunker.py**](./src/ingestion/text_chunker.py): Splits cleaned text into sentence-based chunks.
+
+### 🛠️ Data Transformation
+- [**sentence_transformer.py**](./src.embeddings.sentence_transformer.py): Generates embeddings from sentence chunks.
+
+### 🗄️ Data Management
+- [**vector_store.py**](./src.data.vector_store.py): Stores generated embeddings into a vector database, e.g., Milvus.
 
 ## 📝 Logging
 
