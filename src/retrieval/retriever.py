@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 from pymilvus import Collection
 from sentence_transformers import SentenceTransformer
 from src.utils.logging_utils import setup_logger
+import torch
 
 class MilvusRetriever:
     """Retriever for querying Milvus vector database in RAG pipeline."""
@@ -42,7 +43,7 @@ class MilvusRetriever:
         # Connect to Milvus
         try:
             from pymilvus import connections
-            connections.connect(host=milvus_host, port=milvus_port)
+            connections.connect(alias="default", host=milvus_host, port=milvus_port)
             self.collection = Collection(collection_name)
             self.collection.load()
             self.logger.info(f"Connected to Milvus collection: {collection_name}")
