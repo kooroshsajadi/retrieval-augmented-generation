@@ -3,7 +3,7 @@ from src.retrieval.retriever import MilvusRetriever
 
 class TestMilvusRetriever(unittest.TestCase):
     def setUp(self):
-        self.retriever = MilvusRetriever(collection_name="legal_texts")
+        self.retriever = MilvusRetriever(collection_name="gotmat_collection")
 
     def test_retrieve(self):
         query = "Quali sono i requisiti per la residenza in Italia?"
