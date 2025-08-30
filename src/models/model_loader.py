@@ -1,8 +1,10 @@
 from pathlib import Path
+from typing import Optional
 import torch
 import logging
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from src.utils.logging_utils import setup_logger
+from peft import PeftModel
 
 logger = setup_logger(__name__)
 
@@ -18,8 +20,10 @@ class ModelLoader:
         model_name: str = "model/opus-mt-it-en",
         model_type: str = "seq2seq",
         device_map: str = "auto",
+        adapter_path: Optional[str] = None,
+        tokenizer_path: Optional[str] = None,
         max_length: int = 128,
-        logger: logging.Logger = None
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize ModelLoader for inference.
@@ -49,10 +53,10 @@ class ModelLoader:
         self.dtype = torch.bfloat16 if self.use_xpu else torch.float16 if self.use_gpu else torch.float32
         self.logger.info(f"Using device: {self.device} with dtype {self.dtype}")
 
-        # Load model
+        # Load base model
         try:
             model_class = self.MODEL_TYPE_MAPPING[self.model_type]
-            self.model = model_class.from_pretrained(
+            base_model = model_class.from_pretrained(
                 model_name,
                 device_map=device_map,
                 torch_dtype=self.dtype,
@@ -62,6 +66,16 @@ class ModelLoader:
         except Exception as e:
             self.logger.error(f"Failed to load model {model_name}: {str(e)}")
             raise
+
+        if adapter_path:
+            try:
+                self.model = PeftModel.from_pretrained(base_model, adapter_path).to(self.device)
+                self.logger.info(f"Loaded base model {model_name} with adapter from{adapter_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to load adapter model from {adapter_path}: {str(e)}")
+        else:
+            self.model = base_model
+            self.logger.info(f"Loaded base model {model_name} without adapter")
 
         # Optimize for Intel ARC
         if self.use_xpu:
@@ -74,10 +88,11 @@ class ModelLoader:
 
         self.model.eval()
 
-        # Load tokenizer
+        # Load tokenizer from tokenizer_name if given, else from model_name
+        tokenizer_source = tokenizer_path if tokenizer_path is not None else model_name
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(
-                model_name,
+                tokenizer_source,
                 padding_side='left',
                 trust_remote_code=False
             )

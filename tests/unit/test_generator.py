@@ -4,10 +4,12 @@ from src.generation.generator import LLMGenerator
 class TestLLMGenerator(unittest.TestCase):
     def setUp(self):
         self.generator = LLMGenerator(
-            model_path="model/opus-mt-it-en",
+            model_path="Helsinki-NLP/opus-mt-it-en",
+            adapter_path="models/fine_tuned_models/opus-mt-it-en-v1/model",
+            tokenizer_path="models/fine_tuned_models/opus-mt-it-en-v1/tokenizer",
             model_type="seq2seq",
             max_length=128,
-            device="auto"
+            device="xpu"
         )
 
     def test_generate(self):
@@ -19,7 +21,7 @@ class TestLLMGenerator(unittest.TestCase):
         self.assertIsInstance(response, str)
         self.assertGreater(len(response), 0)
         # Optional: Print for inspection
-        # print(f"Generated response: {response}")
+        print(f"Generated response: {response}")
 
 if __name__ == "__main__":
     unittest.main()

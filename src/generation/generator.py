@@ -1,15 +1,18 @@
 import logging
 from typing import List, Dict, Any
 import torch
-from src.model.model_loader import ModelLoader
+from src.models.model_loader import ModelLoader
 from src.utils.logging_utils import setup_logger
+from typing import Optional
 
 class LLMGenerator:
     """Generator using fine-tuned seq2seq model for response generation in RAG pipeline."""
 
     def __init__(
         self,
-        model_path: str = "model/opus-mt-it-en",
+        model_path: str = "models/fine_tuned_models/opus-mt-it-en",
+        adapter_path: Optional[str] = None,
+        tokenizer_path: Optional[str] = None,
         model_type: str = "seq2seq",
         max_length: int = 128,
         device: str = "auto",
@@ -20,6 +23,8 @@ class LLMGenerator:
 
         Args:
             model_path (str): Path to fine-tuned model.
+            adapter_path: Optional[str]: path to optional adapters.
+            tokenizer_path: Optional[str]: path to optional tokenizer.
             model_type (str): Model type ("seq2seq").
             max_length (int): Maximum sequence length.
             device (str): Device ("auto", "cpu", "xpu").
@@ -32,6 +37,8 @@ class LLMGenerator:
         try:
             self.model_loader = ModelLoader(
                 model_name=model_path,
+                adapter_path=adapter_path,
+                tokenizer_path=tokenizer_path,
                 model_type=model_type,
                 device_map=device,
                 max_length=max_length,
