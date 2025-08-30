@@ -108,16 +108,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # # Directory containing the embeddings
-    # embeddings_dir = 'data/embeddings/prefettura_v1.2_embeddings'
-
-    # # List all .npy files in the directory
-    # embedding_files = [f for f in os.listdir(embeddings_dir) if f.endswith('.npy')]
-
-    # print(f"Found {len(embedding_files)} .npy files in {embeddings_dir}")
-
-    # # Read and print the shape of each embedding file
-    # for file_name in embedding_files:
-    #     file_path = os.path.join(embeddings_dir, file_name)
-    #     embedding = np.load(file_path)
-    #     print(f"{file_name}: shape {embedding.shape}")
