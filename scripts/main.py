@@ -7,11 +7,12 @@ from typing import List, Dict, Any
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
 from src.utils.logging_utils import setup_logger
+from typing import Optional
 
 class RAGOrchestrator:
     """Orchestrates RAG pipeline for query processing and response generation."""
 
-    def __init__(self, config_path: str, logger: logging.Logger = None):
+    def __init__(self, config_path: str, logger: Optional[logging.Logger] = None):
         """
         Initialize RAGOrchestrator.
 
