@@ -1,0 +1,14 @@
+retrieval:
+  collection_name: gotmat_collection
+  embedding_model: intfloat/multilingual-e5-large
+  milvus_host: localhost
+  milvus_port: "19530"
+  top_k: 5
+generation:
+  model_path: model/opus-mt-it-en
+  model_type: seq2seq
+  max_length: 128
+  device: auto
+  max_new_tokens: 50
+output:
+  output_dir: data/destination
