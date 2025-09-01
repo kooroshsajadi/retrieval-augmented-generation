@@ -59,7 +59,6 @@ def main():
 
     # Load all chunk texts
     chunk_names = read_chunk_file_names("data/chunks/prefettura_v1.2_chunks")
-
     print(f"Loaded {len(chunk_names)} text chunks names.")
 
     # Directory and list of embedding files
@@ -89,7 +88,6 @@ def main():
         ids.append(i)
         embeddings.append(embedding_vector.tolist())  # Convert numpy array to list
         chunk_ids.append(chunk_id)
-        # Append the text of the chunk file having the same chunk id in its name.
         texts.append(load_chunk_text(chunk_id, Path("data/chunks/prefettura_v1.2_chunks")))
         subjects.append("courthouse")  # or your subject metadata
 
@@ -99,25 +97,25 @@ def main():
 
     print(f"Prepared {len(ids)} entities for insertion.")
 
-    # Insert into Milvus: must provide field-wise lists in order of schema fields
+    # Insert into Milvus (field-wise lists)
     entities = [ids, embeddings, chunk_ids, texts, subjects]
     insertion_result = collection.insert(entities)
     collection.flush()  # Ensure data persisted
 
     print(f"Inserted {len(insertion_result.primary_keys)} entities into collection {collection_name}.")
 
+    # Create index on vector field - REQUIRED before loading and searching
+    index_params = {
+        "index_type": "IVF_FLAT",  # Choose suitable index type; e.g., IVF_FLAT, HNSW, or ANNOY
+        "metric_type": "L2",       # Must match your search metric
+        "params": {"nlist": 128}   # Tune nlist according to dataset size and recall requirements
+    }
+    collection.create_index(field_name="embedding", index_params=index_params)
+    print("Index created on 'embedding' field.")
+
+    # Load collection to make vectors and index ready for search
+    collection.load()
+    print("Collection loaded and ready for search.")
+
 if __name__ == "__main__":
     main()
-    # # Directory containing the embeddings
-    # embeddings_dir = 'data/embeddings/prefettura_v1.2_embeddings'
-
-    # # List all .npy files in the directory
-    # embedding_files = [f for f in os.listdir(embeddings_dir) if f.endswith('.npy')]
-
-    # print(f"Found {len(embedding_files)} .npy files in {embeddings_dir}")
-
-    # # Read and print the shape of each embedding file
-    # for file_name in embedding_files:
-    #     file_path = os.path.join(embeddings_dir, file_name)
-    #     embedding = np.load(file_path)
-    #     print(f"{file_name}: shape {embedding.shape}")
