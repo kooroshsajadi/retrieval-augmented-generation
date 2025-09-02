@@ -23,8 +23,8 @@ class LLMGenerator:
 
         Args:
             model_path (str): Path to fine-tuned model.
-            adapter_path: Optional[str]: path to optional adapters.
-            tokenizer_path: Optional[str]: path to optional tokenizer.
+            adapter_path: Optional[str]: Path to optional adapters.
+            tokenizer_path: Optional[str]: Path to optional tokenizer.
             model_type (str): Model type ("seq2seq").
             max_length (int): Maximum sequence length.
             device (str): Device ("auto", "cpu", "xpu").
@@ -54,7 +54,7 @@ class LLMGenerator:
 
     def generate(self, query: str, contexts: List[Dict[str, Any]], max_new_tokens: int = 50) -> str:
         """
-        Generate English translation/response using query and retrieved contexts.
+        Generate response in Italian using query and retrieved contexts.
 
         Args:
             query (str): User query (in Italian).
@@ -62,12 +62,12 @@ class LLMGenerator:
             max_new_tokens (int): Maximum tokens to generate.
 
         Returns:
-            str: Generated English response.
+            str: Generated response in Italian.
         """
         try:
             # Create prompt
             context_texts = [ctx["text"] for ctx in contexts]
-            prompt = f"Domanda: {query}\nContesto: {' '.join(context_texts)}\nTraduci in inglese:"
+            prompt = f"Domanda: {query}\nContesto: {' '.join(context_texts)}\nRisposta:"
             self.logger.info(f"Generated prompt: {prompt[:100]}...")
 
             # Tokenize

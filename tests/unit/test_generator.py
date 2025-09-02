@@ -8,7 +8,7 @@ class TestLLMGenerator(unittest.TestCase):
             adapter_path="models/fine_tuned_models/opus-mt-it-en-v1/model",
             tokenizer_path="models/fine_tuned_models/opus-mt-it-en-v1/tokenizer",
             model_type="seq2seq",
-            max_length=128,
+            max_length=5000,
             device="xpu"
         )
 
