@@ -15,7 +15,6 @@ class SentenceTransformerEmbedder:
         output_dir: str = "data/embeddings",
         chunk_size: int = 512,
         chunk_overlap: int = 50,
-        logger: logging.Logger = None
     ):
         """
         Initialize SentenceTransformerEmbedder.
@@ -29,7 +28,7 @@ class SentenceTransformerEmbedder:
         """
         self.model_name = model_name
         self.output_dir = Path(output_dir)
-        self.logger = logger or setup_logger("sentence_transformer")
+        self.logger = setup_logger("sentence_transformer")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize SentenceTransformer model
