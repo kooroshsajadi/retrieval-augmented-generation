@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import pdfplumber
 import pytesseract
 from PIL import Image, ImageEnhance
@@ -7,6 +7,7 @@ from pdf2image import convert_from_path
 from pathlib import Path
 import fitz  # PyMuPDF
 from src.utils.logging_utils import setup_logger
+import os
 
 class DataIngestor:
     """Extracts text from a single PDF, text file, or image for RAG pipeline."""
