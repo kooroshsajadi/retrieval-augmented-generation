@@ -12,5 +12,13 @@ generation:
   max_length: 128
   device: auto
   max_new_tokens: 50
+supported_formats:
+  - .text
+  - .txt
+  - .jpg
+  - .jpeg
+  - .gif
+  - .png
+  - .pdf
 output:
   output_dir: data/destination
