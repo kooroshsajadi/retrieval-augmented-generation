@@ -4,10 +4,9 @@ import yaml
 from pathlib import Path
 from typing import List, Dict, Any
 from src.utils.logging_utils import setup_logger
+from scripts.validate_data import DataValidator
 from scripts.ingest_data import DataIngestor
-from src.ingestion.text_cleaner import TextCleaner
-from src.ingestion.text_chunker import TextChunker
-from src.embeddings.sentence_transformer import SentenceTransformerEmbedder
+from scripts.sentence_transformer import SentenceTransformerEmbedder
 from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
@@ -27,6 +26,10 @@ class RAGOrchestrator:
             self.config = yaml.safe_load(f)
 
         # Initialize components
+        self.validator = DataValidator(
+            supported_formats=self.config.get("supported_formats", [".text", ".txt", ".jpg", ".jpeg", ".gif", ".png", ".pdf"]),
+            logger=self.logger
+        )
         self.data_ingestor = DataIngestor(
             output_dir=self.config["data"]["texts"],
             language="ita",
@@ -40,7 +43,10 @@ class RAGOrchestrator:
             logger=self.logger
         )
         self.embedder = SentenceTransformerEmbedder(
-            model_name=self.config.get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2"),
+            model_name=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
+            output_dir=self.config["data"]["embeddings"],
+            chunk_size=self.config.get("chunk_size", 512),
+            chunk_overlap=self.config.get("chunk_overlap", 50),
             logger=self.logger
         )
         self.vector_store = VectorStore(
@@ -51,7 +57,7 @@ class RAGOrchestrator:
         )
         self.retriever = MilvusRetriever(
             collection_name=self.config.get("collection_name", "legal_texts"),
-            embedding_model=self.config.get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2"),
+            embedding_model=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
             logger=self.logger
@@ -77,14 +83,20 @@ class RAGOrchestrator:
             bool: True if processing is successful, False otherwise.
         """
         try:
+            # Validate file
+            validation_result = self.validator.validate_file(file_path)
+            if not validation_result["is_valid"]:
+                self.logger.error(f"File validation failed: {validation_result['error']}")
+                return False
+
             # Extract text
-            result = self.data_ingestor.extract_text(file_path)
-            if not result["is_valid"]:
-                self.logger.error(f"Failed to extract text from {file_path}: {result['error']}")
+            ingest_result = self.data_ingestor.extract_text(file_path)
+            if not ingest_result["is_valid"]:
+                self.logger.error(f"Text extraction failed: {ingest_result['error']}")
                 return False
 
             # Clean text
-            cleaned_text = self.text_cleaner.clean_text(result["text"])
+            cleaned_text = self.text_cleaner.clean_text(ingest_result["text"])
             cleaned_text_path = Path(self.config["data"]["cleaned_texts"]) / f"{Path(file_path).stem}_cleaned.txt"
             with open(cleaned_text_path, "w", encoding="utf-8") as f:
                 f.write(cleaned_text)
@@ -95,7 +107,12 @@ class RAGOrchestrator:
             self.logger.info(f"Generated {len(chunks)} chunks")
 
             # Generate embeddings and store in Milvus
-            embeddings = self.embedder.generate_embeddings(chunks)
+            embed_result = self.embedder.process_file(file_path, cleaned_text)
+            if not embed_result["is_valid"]:
+                self.logger.error(f"Embedding generation failed: {embed_result['error']}")
+                return False
+            chunks = [c["text"] for c in embed_result["chunk_embeddings"]]
+            embeddings = [np.load(self.config["data"]["embeddings"] / c["embedding_file"]) for c in embed_result["chunk_embeddings"]]
             self.vector_store.store_vectors(chunks, embeddings)
             self.logger.info(f"Stored {len(chunks)} embeddings in Milvus")
             return True
@@ -115,6 +132,12 @@ class RAGOrchestrator:
             str: Generated response in Italian.
         """
         try:
+            # Generate query embedding
+            query_result = self.embedder.process_query(query)
+            if not query_result["is_valid"]:
+                self.logger.error(f"Query embedding failed: {query_result['error']}")
+                return f"Error: {query_result['error']}"
+
             # Retrieve relevant chunks
             contexts = self.retriever.retrieve(query, top_k)
             self.logger.info(f"Retrieved {len(contexts)} contexts for query: {query[:50]}...")
