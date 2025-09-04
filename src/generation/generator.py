@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.utils.logging_utils import setup_logger
+import torch
 
 class LLMGenerator:
     """Generates responses using a language model for the RAG pipeline."""
