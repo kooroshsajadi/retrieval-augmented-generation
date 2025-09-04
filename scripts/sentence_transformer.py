@@ -1,10 +1,11 @@
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from src.ingestion.text_chunker import TextChunker
 from src.utils.logging_utils import setup_logger
+import logging
 
 class SentenceTransformerEmbedder:
     """Generates embeddings for user queries or file-extracted text in RAG pipeline."""
@@ -15,6 +16,7 @@ class SentenceTransformerEmbedder:
         output_dir: str = "data/embeddings",
         chunk_size: int = 512,
         chunk_overlap: int = 50,
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize SentenceTransformerEmbedder.
@@ -28,7 +30,7 @@ class SentenceTransformerEmbedder:
         """
         self.model_name = model_name
         self.output_dir = Path(output_dir)
-        self.logger = setup_logger("sentence_transformer")
+        self.logger = logger or setup_logger("sentence_transformer")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize SentenceTransformer model
