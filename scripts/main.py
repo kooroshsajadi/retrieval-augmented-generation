@@ -1,7 +1,9 @@
 import argparse
+import logging
 import yaml
 import json
 from pathlib import Path
+from typing import List, Dict, Any, Optional
 import numpy as np
 from src.utils.logging_utils import setup_logger
 from scripts.validate_data import DataValidator
@@ -10,6 +12,7 @@ from scripts.sentence_transformer import SentenceTransformerEmbedder
 from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
+from src.generation.augmenter import Augmenter
 
 class RAGOrchestrator:
     """Orchestrates the RAG pipeline for processing user queries and files."""
@@ -57,6 +60,11 @@ class RAGOrchestrator:
             embedding_model=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
+            logger=self.logger
+        )
+        self.augmenter = Augmenter(
+            max_contexts=self.config.get("max_contexts", 5),
+            max_context_length=self.config.get("max_context_length", 1000),
             logger=self.logger
         )
         self.generator = LLMGenerator(
@@ -132,11 +140,14 @@ class RAGOrchestrator:
                 return f"Error: {query_result['error']}"
 
             # Retrieve relevant chunks
-            contexts = self.retriever.retrieve(query_result["embedding"], top_k)
+            contexts = self.retriever.retrieve(query, top_k)
             self.logger.info("Retrieved %d contexts for query: %s...", len(contexts), query[:50])
 
+            # Augment query with contexts
+            prompt = self.augmenter.augment(query, contexts)
+
             # Generate response
-            response = self.generator.generate(query, contexts, max_new_tokens=self.config.get("max_new_tokens", 50))
+            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 50))
             self.logger.info("Generated response: %s...", response[:100])
 
             # Save response
