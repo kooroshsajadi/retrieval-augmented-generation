@@ -39,7 +39,7 @@ class VectorStore:
         self.embedding_dim = embedding_dim
         self.chunks_dir = Path(chunks_dir)
         self.embeddings_dir = Path(embeddings_dir)
-        self.logger = logger or setup_logger("vector_store")
+        self.logger = logger or setup_logger("src.data.vector_store")
         
         # Connect to Milvus
         try:
