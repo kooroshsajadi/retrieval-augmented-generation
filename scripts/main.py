@@ -1,8 +1,8 @@
 import argparse
-import logging
 import yaml
+import json
 from pathlib import Path
-from typing import List, Dict, Any
+import numpy as np
 from src.utils.logging_utils import setup_logger
 from scripts.validate_data import DataValidator
 from scripts.ingest_data import DataIngestor
@@ -36,27 +36,24 @@ class RAGOrchestrator:
             tessdata_dir=self.config.get("tessdata_dir", None),
             logger=self.logger
         )
-        self.text_cleaner = TextCleaner(logger=self.logger)
-        self.text_chunker = TextChunker(
-            chunk_size=self.config.get("chunk_size", 512),
-            chunk_overlap=self.config.get("chunk_overlap", 50),
-            logger=self.logger
-        )
         self.embedder = SentenceTransformerEmbedder(
             model_name=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
             output_dir=self.config["data"]["embeddings"],
-            chunk_size=self.config.get("chunk_size", 512),
-            chunk_overlap=self.config.get("chunk_overlap", 50),
+            max_chunk_words=self.config.get("max_chunk_words", 500),
+            min_chunk_length=self.config.get("min_chunk_length", 10),
             logger=self.logger
         )
         self.vector_store = VectorStore(
-            collection_name=self.config.get("collection_name", "legal_texts"),
+            collection_name=self.config.get("collection_name", "gotmat_collection"),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
+            embedding_dim=self.config.get("embedding_dim", 1024),
+            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.2_chunks"),
+            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.2_embeddings"),
             logger=self.logger
         )
         self.retriever = MilvusRetriever(
-            collection_name=self.config.get("collection_name", "legal_texts"),
+            collection_name=self.config.get("collection_name", "gotmat_collection"),
             embedding_model=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
@@ -86,38 +83,34 @@ class RAGOrchestrator:
             # Validate file
             validation_result = self.validator.validate_file(file_path)
             if not validation_result["is_valid"]:
-                self.logger.error(f"File validation failed: {validation_result['error']}")
+                self.logger.error("File validation failed: %s", validation_result["error"])
                 return False
 
             # Extract text
             ingest_result = self.data_ingestor.extract_text(file_path)
             if not ingest_result["is_valid"]:
-                self.logger.error(f"Text extraction failed: {ingest_result['error']}")
+                self.logger.error("Text extraction failed: %s", ingest_result["error"])
                 return False
 
-            # Clean text
-            cleaned_text = self.text_cleaner.clean_text(ingest_result["text"])
-            cleaned_text_path = Path(self.config["data"]["cleaned_texts"]) / f"{Path(file_path).stem}_cleaned.txt"
-            with open(cleaned_text_path, "w", encoding="utf-8") as f:
-                f.write(cleaned_text)
-            self.logger.info(f"Saved cleaned text to {cleaned_text_path}")
-
-            # Chunk text
-            chunks = self.text_chunker.chunk_text(cleaned_text)
-            self.logger.info(f"Generated {len(chunks)} chunks")
-
-            # Generate embeddings and store in Milvus
-            embed_result = self.embedder.process_file(file_path, cleaned_text)
+            # Generate embeddings
+            embed_result = self.embedder.process_file(file_path, ingest_result["text"])
             if not embed_result["is_valid"]:
-                self.logger.error(f"Embedding generation failed: {embed_result['error']}")
+                self.logger.error("Embedding generation failed: %s", embed_result["error"])
                 return False
-            chunks = [c["text"] for c in embed_result["chunk_embeddings"]]
-            embeddings = [np.load(self.config["data"]["embeddings"] / c["embedding_file"]) for c in embed_result["chunk_embeddings"]]
-            self.vector_store.store_vectors(chunks, embeddings)
-            self.logger.info(f"Stored {len(chunks)} embeddings in Milvus")
+
+            # Store embeddings in Milvus
+            chunk_texts = [c["text"] for c in embed_result["chunk_embeddings"]]
+            embeddings = [np.load(Path(self.config["data"]["embeddings"]) / c["embedding_file"]) for c in embed_result["chunk_embeddings"]]
+            chunk_ids = [c["chunk_id"] for c in embed_result["chunk_embeddings"]]
+            success = self.vector_store.store_vectors(chunk_texts, embeddings, chunk_ids)
+            if not success:
+                self.logger.error("Failed to store embeddings in Milvus")
+                return False
+
+            self.logger.info("Successfully processed and stored embeddings for %s", file_path)
             return True
         except Exception as e:
-            self.logger.error(f"File processing failed for {file_path}: {str(e)}")
+            self.logger.error("File processing failed for %s: %s", file_path, str(e))
             return False
 
     def process_query(self, query: str, top_k: int = 5) -> str:
@@ -135,25 +128,25 @@ class RAGOrchestrator:
             # Generate query embedding
             query_result = self.embedder.process_query(query)
             if not query_result["is_valid"]:
-                self.logger.error(f"Query embedding failed: {query_result['error']}")
+                self.logger.error("Query embedding failed: %s", query_result["error"])
                 return f"Error: {query_result['error']}"
 
             # Retrieve relevant chunks
-            contexts = self.retriever.retrieve(query, top_k)
-            self.logger.info(f"Retrieved {len(contexts)} contexts for query: {query[:50]}...")
+            contexts = self.retriever.retrieve(query_result["embedding"], top_k)
+            self.logger.info("Retrieved %d contexts for query: %s...", len(contexts), query[:50])
 
             # Generate response
             response = self.generator.generate(query, contexts, max_new_tokens=self.config.get("max_new_tokens", 50))
-            self.logger.info(f"Generated response: {response[:100]}...")
+            self.logger.info("Generated response: %s...", response[:100])
 
             # Save response
             output_path = Path(self.config["data"]["destination"]) / f"response_{hash(query)}.json"
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump({"query": query, "response": response, "contexts": contexts}, f, ensure_ascii=False, indent=2)
-            self.logger.info(f"Saved response to {output_path}")
+            self.logger.info("Saved response to %s", output_path)
             return response
         except Exception as e:
-            self.logger.error(f"Query processing failed for '{query}': {str(e)}")
+            self.logger.error("Query processing failed for '%s': %s", query, str(e))
             return f"Error: {str(e)}"
 
 def main():
