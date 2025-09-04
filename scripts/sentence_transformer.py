@@ -2,10 +2,10 @@ import json
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import numpy as np
+import logging
 from sentence_transformers import SentenceTransformer
 from src.ingestion.text_chunker import TextChunker
 from src.utils.logging_utils import setup_logger
-import logging
 
 class SentenceTransformerEmbedder:
     """Generates embeddings for user queries or file-extracted text in RAG pipeline."""
@@ -14,8 +14,8 @@ class SentenceTransformerEmbedder:
         self,
         model_name: str = "intfloat/multilingual-e5-large",
         output_dir: str = "data/embeddings",
-        chunk_size: int = 512,
-        chunk_overlap: int = 50,
+        max_chunk_words: int = 500,
+        min_chunk_length: int = 10,
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -24,13 +24,13 @@ class SentenceTransformerEmbedder:
         Args:
             model_name (str): SentenceTransformer model name.
             output_dir (str): Directory to save embeddings and metadata.
-            chunk_size (int): Maximum size of text chunks for file text.
-            chunk_overlap (int): Overlap between text chunks.
-            logger (logging.Logger, optional): Logger instance.
+            max_chunk_words (int): Maximum words per chunk for file text.
+            min_chunk_length (int): Minimum character length for valid chunks.
+            logger (Optional[logging.Logger]): Logger instance, defaults to None.
         """
         self.model_name = model_name
         self.output_dir = Path(output_dir)
-        self.logger = logger or setup_logger("sentence_transformer")
+        self.logger = logger or setup_logger("scripts.sentence_transformer")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize SentenceTransformer model
@@ -43,8 +43,8 @@ class SentenceTransformerEmbedder:
 
         # Initialize TextChunker for file text
         self.chunker = TextChunker(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
+            max_chunk_words=max_chunk_words,
+            min_chunk_length=min_chunk_length,
             logger=self.logger
         )
 
@@ -142,7 +142,7 @@ class SentenceTransformerEmbedder:
             # Generate embeddings for each chunk
             for i, chunk in enumerate(chunks):
                 chunk_id = f"{file_path.stem}_chunk_{i}"
-                embedding = self.generate_embedding(chunk)
+                embedding = self.generate_embedding(chunk["text"])
                 if embedding.size == 0:
                     self.logger.warning("Empty embedding for chunk %s", chunk_id)
                     continue
@@ -159,7 +159,7 @@ class SentenceTransformerEmbedder:
                 # Store metadata
                 result["chunk_embeddings"].append({
                     "chunk_id": chunk_id,
-                    "text": chunk,
+                    "text": chunk["text"],
                     "embedding_file": f"{chunk_id}.npy",
                     "is_valid": True
                 })
@@ -191,8 +191,8 @@ if __name__ == "__main__":
     embedder = SentenceTransformerEmbedder(
         model_name="intfloat/multilingual-e5-large",
         output_dir="data/embeddings",
-        chunk_size=512,
-        chunk_overlap=50
+        max_chunk_words=500,
+        min_chunk_length=10
     )
 
     # Test with a query
