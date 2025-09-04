@@ -1,95 +1,80 @@
 import logging
-from typing import List, Dict, Any
-import torch
-from src.models.model_loader import ModelLoader
-from src.utils.logging_utils import setup_logger
 from typing import Optional
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from src.utils.logging_utils import setup_logger
 
 class LLMGenerator:
-    """Generator using fine-tuned seq2seq model for response generation in RAG pipeline."""
+    """Generates responses using a language model for the RAG pipeline."""
 
     def __init__(
         self,
-        model_path: str = "models/fine_tuned_models/opus-mt-it-en",
+        model_path: str,
         adapter_path: Optional[str] = None,
         tokenizer_path: Optional[str] = None,
         model_type: str = "seq2seq",
         max_length: int = 128,
         device: str = "auto",
-        logger: logging.Logger = None
+        logger: Optional[logging.Logger] = None
     ):
         """
-        Initialize LLMGenerator.
+        Initialize LLMGenerator with model and tokenizer.
 
         Args:
-            model_path (str): Path to fine-tuned model.
-            adapter_path: Optional[str]: Path to optional adapters.
-            tokenizer_path: Optional[str]: Path to optional tokenizer.
-            model_type (str): Model type ("seq2seq").
-            max_length (int): Maximum sequence length.
-            device (str): Device ("auto", "cpu", "xpu").
-            logger (logging.Logger, optional): Logger instance.
+            model_path (str): Path or name of the language model.
+            adapter_path (Optional[str]): Path to model adapter, if any.
+            tokenizer_path (Optional[str]): Path to tokenizer, if different from model.
+            model_type (str): Type of model (e.g., 'seq2seq').
+            max_length (int): Maximum input length for tokenization.
+            device (str): Device to run model on ('auto', 'cpu', 'cuda').
+            logger (Optional[logging.Logger]): Logger instance.
         """
-        self.logger = logger or setup_logger(__name__)
+        self.logger = logger or setup_logger("llm_generator")
         self.max_length = max_length
+        self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.model_type = model_type
 
-        # Load model using ModelLoader
         try:
-            self.model_loader = ModelLoader(
-                model_name=model_path,
-                adapter_path=adapter_path,
-                tokenizer_path=tokenizer_path,
-                model_type=model_type,
-                device_map=device,
-                max_length=max_length,
-                logger=self.logger
-            )
-            self.model = self.model_loader.model
-            self.tokenizer = self.model_loader.tokenizer
-            self.device = self.model_loader.device
-            self.logger.info(f"Loaded model {model_path} on {self.device}")
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path or model_path)
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+            if adapter_path:
+                self.model.load_adapter(adapter_path)
+            self.model.to(self.device)
+            self.logger.info("Loaded model %s on %s", model_path, self.device)
         except Exception as e:
-            self.logger.error(f"Failed to initialize ModelLoader: {str(e)}")
+            self.logger.error("Failed to load model or tokenizer: %s", str(e))
             raise
 
-    def generate(self, query: str, contexts: List[Dict[str, Any]], max_new_tokens: int = 50) -> str:
+    def generate(self, prompt: str, max_new_tokens: int = 50) -> str:
         """
-        Generate response in Italian using query and retrieved contexts.
+        Generate a response from a formatted prompt.
 
         Args:
-            query (str): User query (in Italian).
-            contexts (List[Dict[str, Any]]): Retrieved chunks with 'text' field.
-            max_new_tokens (int): Maximum tokens to generate.
+            prompt (str): Input prompt containing query and contexts.
+            max_new_tokens (int): Maximum number of new tokens to generate.
 
         Returns:
-            str: Generated response in Italian.
+            str: Generated response.
         """
         try:
-            # Create prompt
-            context_texts = [ctx["text"] for ctx in contexts]
-            prompt = f"Domanda: {query}\nContesto: {' '.join(context_texts)}\nRisposta:"
-            self.logger.info(f"Generated prompt: {prompt[:100]}...")
-
-            # Tokenize
-            inputs = self.tokenizer(
-                prompt,
-                return_tensors="pt",
-                padding="max_length",
-                truncation=True,
-                max_length=self.max_length
-            ).to(self.device)
-
-            # Generate
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=max_new_tokens,
-                    num_beams=5,
-                    early_stopping=True
-                )
+            inputs = self.tokenizer(prompt, return_tensors="pt", max_length=self.max_length, truncation=True).to(self.device)
+            outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
             response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            self.logger.info(f"Generated response: {response[:100]}...")
+            self.logger.info("Generated response for prompt: %s...", prompt[:50])
             return response
         except Exception as e:
-            self.logger.error(f"Generation failed for query '{query}': {str(e)}")
-            raise
+            self.logger.error("Generation failed: %s", str(e))
+            return f"Error: {str(e)}"
+
+if __name__ == "__main__":
+    # Example usage
+    generator = LLMGenerator(
+        model_path="facebook/opus-mt-it-en",
+        max_length=128,
+        device="auto"
+    )
+    prompt = """Query: Quali sono i requisiti per la residenza in Italia?
+Context:
+1. (courthouse) Per la residenza in Italia, è necessario un passaporto valido...
+2. (courthouse) I requisiti includono un'assicurazione sanitaria valida..."""
+    response = generator.generate(prompt, max_new_tokens=50)
+    print(f"Response: {response}")
