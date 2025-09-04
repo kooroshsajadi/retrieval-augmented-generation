@@ -12,7 +12,7 @@ from scripts.sentence_transformer import SentenceTransformerEmbedder
 from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
-from src.generation.augmenter import Augmenter
+from src.augmentation.augmenter import Augmenter
 
 class RAGOrchestrator:
     """Orchestrates the RAG pipeline for processing user queries and files."""
