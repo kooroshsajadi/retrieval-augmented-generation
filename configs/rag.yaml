@@ -1,17 +1,10 @@
-retrieval:
-  collection_name: gotmat_collection
-  embedding_model: intfloat/multilingual-e5-large
-  milvus_host: localhost
-  milvus_port: "19530"
-  top_k: 5
-generation:
-  model_path: Helsinki-NLP/opus-mt-it-en
-  adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
-  tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
-  model_type: seq2seq
-  max_length: 128
-  device: auto
-  max_new_tokens: 50
+data:
+  source: data/source
+  texts: data/texts
+  cleaned_texts: data/cleaned_texts
+  chunks: data/chunks/prefettura_v1.2_chunks
+  embeddings: data/embeddings/prefettura_v1.2_embeddings
+  destination: data/destination
 supported_formats:
   - .text
   - .txt
@@ -20,5 +13,19 @@ supported_formats:
   - .gif
   - .png
   - .pdf
-output:
-  output_dir: data/destination
+embedding_model: intfloat/multilingual-e5-large
+embedding_dim: 1024
+collection_name: gotmat_collection
+milvus_host: localhost
+milvus_port: 19530
+model_path: Helsinki-NLP/opus-mt-it-en
+adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
+tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
+max_length: 128
+max_new_tokens: 50
+device: auto
+max_chunk_words: 500
+min_chunk_length: 10
+max_contexts: 5
+max_context_length: 1000
+tessdata_dir: C:/Program Files/Tesseract-OCR/tessdata
