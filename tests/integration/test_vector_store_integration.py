@@ -1,16 +1,16 @@
 import unittest
 import logging
 import csv
-import shutil
 from pathlib import Path
 import numpy as np
+from typing import Optional
 from pymilvus import connections, has_collection, Collection, DataType
 from src.data.vector_store import VectorStore
 from src.utils.logging_utils import setup_logger
 
 class TestVectorStoreIntegration(unittest.TestCase):
     def setUp(self):
-        """Set up test environment, logger, and temporary directories."""
+        """Set up test environment and logger."""
         self.logger = setup_logger("src.data.test_vector_store_integration")
         self.logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
@@ -27,9 +27,11 @@ class TestVectorStoreIntegration(unittest.TestCase):
         self.results_dir = Path("data/test/results")
         self.texts_dir = Path("data/test/texts")
 
-        # Create directories
+        # Verify directories exist
         for dir_path in [self.chunks_dir, self.embeddings_dir, self.results_dir, self.texts_dir]:
-            dir_path.mkdir(parents=True, exist_ok=True)
+            if not dir_path.exists():
+                self.logger.error("Directory not found: %s", dir_path)
+                self.fail(f"Directory not found: {dir_path}")
 
         # CSV file for results
         self.csv_file = self.results_dir / "vector_store_test_results.csv"
@@ -75,19 +77,45 @@ class TestVectorStoreIntegration(unittest.TestCase):
             self.logger.error("Failed to save CSV file %s: %s", self.csv_file, str(e))
             self.fail(f"Failed to save CSV file: {str(e)}")
 
-    def _create_sample_data(self, num_chunks: int = 3):
-        """Create sample chunk texts and embeddings."""
-        texts = [f"Sample text {i}" for i in range(num_chunks)]
-        embeddings = [np.random.rand(self.embedding_dim).astype(np.float32) for _ in range(num_chunks)]
-        chunk_ids = [f"test_chunk_{i}" for i in range(num_chunks)]
+    def _load_test_data(self, max_chunks: Optional[int] = None):
+        """Load existing chunk texts and embeddings from directories."""
+        chunk_ids = sorted([f.stem for f in self.chunks_dir.glob("*.txt")])
+        if not chunk_ids:
+            self.logger.error("No chunk files found in %s", self.chunks_dir)
+            self.fail(f"No chunk files found in {self.chunks_dir}")
 
-        # Write chunk files
-        for chunk_id, text in zip(chunk_ids, texts):
-            with open(self.chunks_dir / f"{chunk_id}.txt", "w", encoding="utf-8") as f:
-                f.write(text)
-            np.save(self.embeddings_dir / f"{chunk_id}.npy", embeddings[chunk_ids.index(chunk_id)])
+        texts = []
+        embeddings = []
+        valid_chunk_ids = []
+        for chunk_id in chunk_ids[:max_chunks]:
+            # Load chunk text
+            chunk_file = self.chunks_dir / f"{chunk_id}.txt"
+            try:
+                with open(chunk_file, "r", encoding="utf-8") as f:
+                    text = f.read()
+                    if not text:
+                        self.logger.warning("Empty chunk file %s, skipping", chunk_file)
+                        continue
+            except Exception as e:
+                self.logger.warning("Failed to read chunk file %s: %s, skipping", chunk_file, str(e))
+                continue
 
-        return texts, embeddings, chunk_ids
+            # Load embedding
+            embedding_file = self.embeddings_dir / f"{chunk_id}.npy"
+            try:
+                embedding = np.load(embedding_file)
+                if embedding.shape[0] != self.embedding_dim:
+                    self.logger.warning("Embedding for chunk %s has dimension %s, expected %s, skipping", chunk_id, embedding.shape[0], self.embedding_dim)
+                    continue
+            except Exception as e:
+                self.logger.warning("Failed to load embedding %s: %s, skipping", embedding_file, str(e))
+                continue
+
+            texts.append(text)
+            embeddings.append(embedding)
+            valid_chunk_ids.append(chunk_id)
+
+        return texts, embeddings, valid_chunk_ids
 
     def test_collection_creation(self):
         """Test collection creation and schema."""
@@ -96,7 +124,7 @@ class TestVectorStoreIntegration(unittest.TestCase):
             # Verify collection exists
             self.assertTrue(has_collection(self.collection_name), "Collection not created")
             collection = Collection(self.collection_name)
-            
+
             # Check schema
             schema = collection.schema
             expected_fields = {
@@ -111,10 +139,10 @@ class TestVectorStoreIntegration(unittest.TestCase):
                 self.assertEqual(field.dtype, expected_fields[field.name], f"Field {field.name} has incorrect type")
                 if field.name == "embedding":
                     self.assertEqual(field.params["dim"], self.embedding_dim, "Embedding dimension mismatch")
-            
+
             # Check number of entities (should be 0 initially)
             self.assertEqual(collection.num_entities, 0, "Collection should be empty")
-            
+
             self.csv_data.append([test_case, "PASS", f"Collection {self.collection_name} created with correct schema"])
             self.logger.info("Collection creation test passed")
         except Exception as e:
@@ -123,11 +151,14 @@ class TestVectorStoreIntegration(unittest.TestCase):
             self.fail(f"Collection creation test failed: {str(e)}")
 
     def test_bulk_insert(self):
-        """Test bulk insertion of chunks and embeddings."""
+        """Test bulk insertion of chunks and embeddings from directories."""
         test_case = "Bulk Insert"
         try:
-            # Create sample data
-            texts, embeddings, chunk_ids = self._create_sample_data(num_chunks=3)
+            # Load existing data
+            texts, embeddings, chunk_ids = self._load_test_data()
+            if not texts:
+                self.logger.error("No valid test data found")
+                self.fail("No valid test data found")
 
             # Perform bulk insert
             success = self.vector_store.bulk_insert()
@@ -168,8 +199,11 @@ class TestVectorStoreIntegration(unittest.TestCase):
         """Test incremental insertion of a single chunk."""
         test_case = "Incremental Insert"
         try:
-            # Create sample data
-            texts, embeddings, chunk_ids = self._create_sample_data(num_chunks=1)
+            # Load one chunk for incremental insert
+            texts, embeddings, chunk_ids = self._load_test_data(max_chunks=1)
+            if not texts:
+                self.logger.error("No valid test data found")
+                self.fail("No valid test data found")
 
             # Perform incremental insert
             success = self.vector_store.store_vectors(texts, embeddings, chunk_ids, subject="courthouse", force_recreate=False)
@@ -178,11 +212,11 @@ class TestVectorStoreIntegration(unittest.TestCase):
             # Verify collection state
             collection = Collection(self.collection_name)
             collection.load()
-            self.assertEqual(collection.num_entities, 1, "Expected 1 entity after incremental insert")
+            self.assertEqual(collection.num_entities, len(texts), f"Expected {len(texts)} entities, got {collection.num_entities}")
 
             # Verify data integrity
             results = collection.query(expr="id >= 0", output_fields=["id", "chunk_id", "text", "subject"])
-            self.assertEqual(len(results), 1, "Query result count mismatch")
+            self.assertEqual(len(results), len(texts), "Query result count mismatch")
             self.assertEqual(results[0]["chunk_id"], chunk_ids[0], "Chunk ID mismatch")
             self.assertEqual(results[0]["text"], texts[0], "Text mismatch")
             self.assertEqual(results[0]["subject"], "courthouse", "Subject mismatch")
@@ -191,7 +225,7 @@ class TestVectorStoreIntegration(unittest.TestCase):
             embedding_results = collection.query(expr="id >= 0", output_fields=["embedding"])
             self.assertEqual(len(embedding_results[0]["embedding"]), self.embedding_dim, "Embedding dimension mismatch")
 
-            self.csv_data.append([test_case, "PASS", "Incremental insert successful, verified data"])
+            self.csv_data.append([test_case, "PASS", f"Incremental insert successful, inserted {len(texts)} entities"])
             self.logger.info("Incremental insert test passed")
         except Exception as e:
             self.csv_data.append([test_case, "FAIL", f"Error: {str(e)}"])
@@ -202,9 +236,13 @@ class TestVectorStoreIntegration(unittest.TestCase):
         """Test insertion with invalid embedding dimension."""
         test_case = "Invalid Embedding Dimension"
         try:
-            texts = ["Sample text"]
+            # Use valid text and chunk_id but invalid embedding
+            texts, _, chunk_ids = self._load_test_data(max_chunks=1)
+            if not texts:
+                self.logger.error("No valid test data found")
+                self.fail("No valid test data found")
+
             embeddings = [np.random.rand(512).astype(np.float32)]  # Wrong dimension
-            chunk_ids = ["invalid_chunk"]
             success = self.vector_store.store_vectors(texts, embeddings, chunk_ids)
             self.assertFalse(success, "Insert should fail with invalid embedding dimension")
             self.csv_data.append([test_case, "PASS", "Correctly rejected invalid embedding dimension"])
@@ -220,8 +258,6 @@ class TestVectorStoreIntegration(unittest.TestCase):
             if has_collection(self.collection_name):
                 Collection(self.collection_name).drop()
                 self.logger.info("Dropped test collection: %s", self.collection_name)
-            shutil.rmtree(self.chunks_dir, ignore_errors=True)
-            shutil.rmtree(self.embeddings_dir, ignore_errors=True)
             self._save_csv()
         except Exception as e:
             self.logger.error("Teardown failed: %s", str(e))

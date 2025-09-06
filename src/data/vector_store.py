@@ -72,14 +72,14 @@ class VectorStore:
             self.logger.warning("Chunk text file %s not found", chunk_file)
             return ""
 
-    def _read_chunk_file_names(self) -> set:
+    def _read_chunk_file_names(self) -> List[str]:
         """
         Read all .txt file stems in the chunks directory to get valid chunk IDs.
-
+    
         Returns:
-            set: Set of chunk ID strings (filename stems).
+            List[str]: Sorted list of chunk ID strings (filename stems).
         """
-        chunk_file_names = {file_path.stem for file_path in self.chunks_dir.glob("*.txt")}
+        chunk_file_names = sorted([file_path.stem for file_path in self.chunks_dir.glob("*.txt")])
         self.logger.info("Found %d chunk text files in %s", len(chunk_file_names), self.chunks_dir)
         return chunk_file_names
 
