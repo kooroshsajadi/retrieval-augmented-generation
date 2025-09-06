@@ -75,7 +75,7 @@ class VectorStore:
     def _read_chunk_file_names(self) -> List[str]:
         """
         Read all .txt file stems in the chunks directory to get valid chunk IDs.
-    
+
         Returns:
             List[str]: Sorted list of chunk ID strings (filename stems).
         """
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set up logger
-    logger = setup_logger("vector_store_main")
+    logger = setup_logger("src.data.vector_store")
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
