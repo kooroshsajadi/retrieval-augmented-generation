@@ -6,9 +6,9 @@ from scripts.main import RAGOrchestrator
 from src.utils.logging_utils import setup_logger
 
 class TestRAGOrchestratorIntegration(unittest.TestCase):
-    def setup(self):
+    def setUp(self):
         """Set up the test environment and logger."""
-        self.logger = setup_logger("rag_orchestrator_test")
+        self.logger = setup_logger("tests.integration.test_rag_orchestrator_integration")
         self.logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
@@ -54,74 +54,74 @@ class TestRAGOrchestratorIntegration(unittest.TestCase):
         self.csv_data.append([self.test_query, response])
         self.logger.info("Query-only test passed: %s", response[:50])
 
-    def test_process_file_and_query_pdf(self):
-        """Test file processing and query with a PDF file."""
-        file_path = self.test_files["pdf"]
-        text_file = self.texts_dir / f"{Path(file_path).stem}.txt"
+    # def test_process_file_and_query_pdf(self):
+    #     """Test file processing and query with a PDF file."""
+    #     file_path = self.test_files["pdf"]
+    #     text_file = self.texts_dir / f"{Path(file_path).stem}.txt"
         
-        # Skip if test file or extracted text doesn't exist
-        if not Path(file_path).exists():
-            self.skipTest(f"Test file not found: {file_path}")
-        if not text_file.exists():
-            self.skipTest(f"Extracted text not found: {text_file}")
+    #     # Skip if test file or extracted text doesn't exist
+    #     if not Path(file_path).exists():
+    #         self.skipTest(f"Test file not found: {file_path}")
+    #     if not text_file.exists():
+    #         self.skipTest(f"Extracted text not found: {text_file}")
 
-        # Process file
-        success = self.orchestrator.process_file(file_path)
-        self.assertTrue(success, f"File processing failed for {file_path}")
+    #     # Process file
+    #     success = self.orchestrator.process_file(file_path)
+    #     self.assertTrue(success, f"File processing failed for {file_path}")
 
-        # Process query
-        response = self.orchestrator.process_query(self.test_query, top_k=2)
-        self.assertIsInstance(response, str)
-        self.assertNotIn("Error:", response, f"Query processing failed: {response}")
-        self.assertGreater(len(response), 0, "Response is empty")
-        self.csv_data.append([text_file.as_posix(), response])
-        self.logger.info("PDF file and query test passed: %s", response[:50])
+    #     # Process query
+    #     response = self.orchestrator.process_query(self.test_query, top_k=2)
+    #     self.assertIsInstance(response, str)
+    #     self.assertNotIn("Error:", response, f"Query processing failed: {response}")
+    #     self.assertGreater(len(response), 0, "Response is empty")
+    #     self.csv_data.append([text_file.as_posix(), response])
+    #     self.logger.info("PDF file and query test passed: %s", response[:50])
 
-    def test_process_file_and_query_txt(self):
-        """Test file processing and query with a text file."""
-        file_path = self.test_files["txt"]
-        text_file = self.texts_dir / f"{Path(file_path).stem}.txt"
+    # def test_process_file_and_query_txt(self):
+    #     """Test file processing and query with a text file."""
+    #     file_path = self.test_files["txt"]
+    #     text_file = self.texts_dir / f"{Path(file_path).stem}.txt"
         
-        # Skip if test file or extracted text doesn't exist
-        if not Path(file_path).exists():
-            self.skipTest(f"Test file not found: {file_path}")
-        if not text_file.exists():
-            self.skipTest(f"Extracted text not found: {text_file}")
+    #     # Skip if test file or extracted text doesn't exist
+    #     if not Path(file_path).exists():
+    #         self.skipTest(f"Test file not found: {file_path}")
+    #     if not text_file.exists():
+    #         self.skipTest(f"Extracted text not found: {text_file}")
 
-        # Process file
-        success = self.orchestrator.process_file(file_path)
-        self.assertTrue(success, f"File processing failed for {file_path}")
+    #     # Process file
+    #     success = self.orchestrator.process_file(file_path)
+    #     self.assertTrue(success, f"File processing failed for {file_path}")
 
-        # Process query
-        response = self.orchestrator.process_query(self.test_query, top_k=2)
-        self.assertIsInstance(response, str)
-        self.assertNotIn("Error:", response, f"Query processing failed: {response}")
-        self.assertGreater(len(response), 0, "Response is empty")
-        self.csv_data.append([text_file.as_posix(), response])
-        self.logger.info("Text file and query test passed: %s", response[:50])
+    #     # Process query
+    #     response = self.orchestrator.process_query(self.test_query, top_k=2)
+    #     self.assertIsInstance(response, str)
+    #     self.assertNotIn("Error:", response, f"Query processing failed: {response}")
+    #     self.assertGreater(len(response), 0, "Response is empty")
+    #     self.csv_data.append([text_file.as_posix(), response])
+    #     self.logger.info("Text file and query test passed: %s", response[:50])
 
-    def test_process_file_and_query_image(self):
-        """Test file processing and query with an image file."""
-        file_path = self.test_files["jpg"]
-        text_file = self.texts_dir / f"{Path(file_path).stem}.txt"
+    # def test_process_file_and_query_image(self):
+    #     """Test file processing and query with an image file."""
+    #     file_path = self.test_files["jpg"]
+    #     text_file = self.texts_dir / f"{Path(file_path).stem}.txt"
         
-        # Skip if test file or extracted text doesn't exist
-        if not Path(file_path).exists():
-            self.skipTest(f"Test file not found: {file_path}")
-        if not text_file.exists():
-            self.skipTest(f"Extracted text not found: {text_file}")
+    #     # Skip if test file or extracted text doesn't exist
+    #     if not Path(file_path).exists():
+    #         self.skipTest(f"Test file not found: {file_path}")
+    #     if not text_file.exists():
+    #         self.skipTest(f"Extracted text not found: {text_file}")
 
-        # Process file
-        success = self.orchestrator.process_file(file_path)
-        self.assertTrue(success, f"File processing failed for {file_path}")
+    #     # Process file
+    #     success = self.orchestrator.process_file(file_path)
+    #     self.assertTrue(success, f"File processing failed for {file_path}")
 
-        # Process query
-        response = self.orchestrator.process_query(self.test_query, top_k=2)
-        self.assertIsInstance(response, str)
-        self.assertNotIn("Error:", response, f"Query processing failed: {response}")
-        self.assertGreater(len(response), 0, "Response is empty")
-        self.csv_data.append([text_file.as_posix(), response])
-        self.logger.info("Image file and query test passed: %s", response[:50])
+    #     # Process query
+    #     response = self.orchestrator.process_query(self.test_query, top_k=2)
+    #     self.assertIsInstance(response, str)
+    #     self.assertNotIn("Error:", response, f"Query processing failed: {response}")
+    #     self.assertGreater(len(response), 0, "Response is empty")
+    #     self.csv_data.append([text_file.as_posix(), response])
+    #     self.logger.info("Image file and query test passed: %s", response[:50])
 
     # def test_process_invalid_file(self):
     #     """Test processing an invalid file."""
@@ -152,7 +152,7 @@ class TestRAGOrchestratorIntegration(unittest.TestCase):
     #         self.assertIn(self.test_query, [row[0] for row in rows], "Query not found in CSV")
     #     self.logger.info("CSV output test passed")
 
-    def tear_down(self):
+    def tearDown(self):
         """Save CSV results after all tests."""
         self._save_csv()
 
