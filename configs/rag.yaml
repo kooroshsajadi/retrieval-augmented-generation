@@ -21,8 +21,8 @@ milvus_port: 19530
 model_path: Helsinki-NLP/opus-mt-it-en
 adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
 tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
-max_length: 256
-max_new_tokens: 100
+max_length: 512
+max_new_tokens: 200
 device: auto
 max_chunk_words: 500
 min_chunk_length: 10
