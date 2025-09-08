@@ -69,9 +69,9 @@ class RAGOrchestrator:
             logger=self.logger
         )
         self.generator = LLMGenerator(
-            model_path=self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
-            adapter_path=self.config.get("adapter_path", "models/fine_tuned_models/opus-mt-it-en-v1/model"),
-            tokenizer_path=self.config.get("tokenizer_path", "models/fine_tuned_models/opus-mt-it-en-v1/tokenizer"),
+            model_path="facebook/mbart-large-50", #self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
+            #adapter_path=self.config.get("adapter_path", "models/fine_tuned_models/opus-mt-it-en-v1/model"),
+            #tokenizer_path=self.config.get("tokenizer_path", "models/fine_tuned_models/opus-mt-it-en-v1/tokenizer"),
             model_type="seq2seq",
             max_length=self.config.get("max_length", 128),
             device=self.config.get("device", "auto"),
