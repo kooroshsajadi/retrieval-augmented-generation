@@ -7,11 +7,12 @@ import numpy as np
 from pymilvus import connections, has_collection, Collection
 from src.utils.logging_utils import setup_logger
 from scripts.main import RAGOrchestrator
+import yaml
 
 class TestRAGOrchestratorIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test environment and logger."""
-        self.logger = setup_logger("tests.integration.test_rag_orchestrator")
+        self.logger = setup_logger("tests.integration.test_rag_orchestrator_integration")
         self.logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
@@ -22,10 +23,10 @@ class TestRAGOrchestratorIntegration(unittest.TestCase):
         self.collection_name = "test_gotmat_collection"
         self.test_dir = Path("data/test")
         self.output_dir = self.test_dir / "results"
-        self.chunks_dir = self.test_dir / "chunks"
-        self.embeddings_dir = self.test_dir / "embeddings"
+        self.chunks_dir = "data/chunks"
+        self.embeddings_dir = "data/embeddings"
         self.texts_dir = self.test_dir / "texts"
-        self.queries_file = self.test_dir / "prompt_translations.json"
+        self.queries_file = self.test_dir / "prompts.json"
         self.output_file = self.output_dir / "responses.json"
 
         # Test files
