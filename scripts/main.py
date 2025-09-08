@@ -17,7 +17,7 @@ from src.augmentation.augmenter import Augmenter
 class RAGOrchestrator:
     """Orchestrates the RAG pipeline for processing user queries and files."""
 
-    def __init__(self, config_path: str = "configs/rag.yaml"):
+    def __init__(self, config_path: str = "configs/rag.yaml", extended: bool = False):
         """
         Initialize RAGOrchestrator with configuration.
 
@@ -27,6 +27,7 @@ class RAGOrchestrator:
         self.logger = setup_logger("scripts.main")
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
+        self.extended = extended
 
         # Initialize components
         self.validator = DataValidator(
@@ -68,9 +69,9 @@ class RAGOrchestrator:
             logger=self.logger
         )
         self.generator = LLMGenerator(
-            model_path=self.config.get("model_path", "models/fine_tuned_models/opus-mt-it-en"),
-            adapter_path=self.config.get("adapter_path", None),
-            tokenizer_path=self.config.get("tokenizer_path", None),
+            model_path=self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
+            adapter_path=self.config.get("adapter_path", "models/fine_tuned_models/opus-mt-it-en-v1/model"),
+            tokenizer_path=self.config.get("tokenizer_path", "models/fine_tuned_models/opus-mt-it-en-v1/tokenizer"),
             model_type="seq2seq",
             max_length=self.config.get("max_length", 128),
             device=self.config.get("device", "auto"),
@@ -169,7 +170,7 @@ class RAGOrchestrator:
             queries_file (Union[Path, str]): Path to JSON file with queries.
             output_path (Union[Path, str]): Path to save output JSON.
             top_k (int): Number of chunks to retrieve per query.
-            extended (bool): If True, print extended output with top-k chunks to console.
+            extended (bool): If True, include top-k chunks in output JSON and print to console.
 
         Returns:
             bool: True if processing is successful, False otherwise.
@@ -191,9 +192,23 @@ class RAGOrchestrator:
                     continue
                 query = item["Italian"]
                 result = self.process_query(query, top_k)
-                results.append({"query": query, "answer": result["response"]})
+                # Include contexts in output JSON if extended is True
+                output_item = {
+                    "query": query,
+                    "answer": result["response"]
+                }
+                if extended:
+                    output_item["contexts"] = [
+                        {
+                            "chunk_id": context["chunk_id"],
+                            "text": context["text"],
+                            "distance": context["distance"]
+                        } for context in result["contexts"]
+                    ]
 
-                # Print extended output if requested
+                results.append(output_item)
+
+                # Print extended output to console if requested
                 if extended:
                     self.logger.info("Query: %s", query)
                     self.logger.info("Answer: %s", result["response"])
@@ -205,7 +220,7 @@ class RAGOrchestrator:
                         self.logger.info("  Distance: %.4f", context["distance"])
                     self.logger.info("-" * 50)
 
-            # Save results to JSON (only query and answer)
+            # Save results to JSON
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
@@ -236,7 +251,8 @@ def main():
 
     # Process queries from file if provided
     if args.queries_file:
-        success = orchestrator.process_queries_from_file(args.queries_file, args.output)
+        success = orchestrator.process_queries_from_file(queries_file=args.queries_file,
+                                                         output_path=args.output, extended=args.extended)
         if success:
             print(f"Successfully processed queries from {args.queries_file} and saved to {args.output}")
         else:
