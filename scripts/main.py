@@ -24,7 +24,7 @@ class RAGOrchestrator:
         Args:
             config_path (str): Path to configuration file.
         """
-        self.logger = setup_logger("rag_orchestrator")
+        self.logger = setup_logger("scripts.main")
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
 
@@ -155,15 +155,21 @@ class RAGOrchestrator:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
             return {"query": query, "response": f"Error: {str(e)}", "contexts": []}
 
-    def process_queries_from_file(self, queries_file: Union[Path, str],
-                                  output_path: Union[Path, str], top_k: int = 5) -> bool:
+    def process_queries_from_file(
+        self, 
+        queries_file: Union[Path, str], 
+        output_path: Union[Path, str], 
+        top_k: int = 5, 
+        extended: bool = False
+    ) -> bool:
         """
         Process queries from a JSON file and save results to output JSON.
 
         Args:
-            queries_file Union[Path, str]: Path to JSON file with queries.
-            output_path Union[Path, str]: Path to save output JSON.
+            queries_file (Union[Path, str]): Path to JSON file with queries.
+            output_path (Union[Path, str]): Path to save output JSON.
             top_k (int): Number of chunks to retrieve per query.
+            extended (bool): If True, print extended output with top-k chunks to console.
 
         Returns:
             bool: True if processing is successful, False otherwise.
@@ -187,7 +193,19 @@ class RAGOrchestrator:
                 result = self.process_query(query, top_k)
                 results.append({"query": query, "answer": result["response"]})
 
-            # Save results to JSON
+                # Print extended output if requested
+                if extended:
+                    self.logger.info("Query: %s", query)
+                    self.logger.info("Answer: %s", result["response"])
+                    self.logger.info("Top-%d closest chunks:", top_k)
+                    for i, context in enumerate(result["contexts"], 1):
+                        self.logger.info("Chunk %d:", i)
+                        self.logger.info("  Chunk ID: %s", context["chunk_id"])
+                        self.logger.info("  Text: %s...", context["text"][:100])
+                        self.logger.info("  Distance: %.4f", context["distance"])
+                    self.logger.info("-" * 50)
+
+            # Save results to JSON (only query and answer)
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
@@ -200,10 +218,11 @@ class RAGOrchestrator:
 
 def main():
     parser = argparse.ArgumentParser(description="RAG Pipeline Orchestrator")
-    parser.add_argument("--queries_file", default="data/prompts.json",type=str, help="Path to JSON file with queries")
+    parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text, or image)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
     parser.add_argument("--output", type=str, default="data/results/responses.json", help="Path to save query responses")
+    parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 
     orchestrator = RAGOrchestrator(config_path=args.config)
