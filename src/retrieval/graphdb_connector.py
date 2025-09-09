@@ -1,5 +1,8 @@
 from SPARQLWrapper import SPARQLWrapper, JSON, SPARQLExceptions
 
+#TODO: Refactor class to be similar to Milvus connector.
+# TODO: Add an interface for connection.
+
 class GraphDBConnectionError(Exception):
     """Custom exception for connection failures."""
     pass
