@@ -3,7 +3,7 @@ import logging
 import yaml
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import numpy as np
 from src.utils.logging_utils import setup_logger
 from scripts.validate_data import DataValidator
@@ -17,16 +17,17 @@ from src.augmentation.augmenter import Augmenter
 class RAGOrchestrator:
     """Orchestrates the RAG pipeline for processing user queries and files."""
 
-    def __init__(self, config_path: str = "configs/rag.yaml"):
+    def __init__(self, config_path: str = "configs/rag.yaml", extended: bool = False):
         """
         Initialize RAGOrchestrator with configuration.
 
         Args:
             config_path (str): Path to configuration file.
         """
-        self.logger = setup_logger("rag_orchestrator")
+        self.logger = setup_logger("scripts.main")
         with open(config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
+        self.extended = extended
 
         # Initialize components
         self.validator = DataValidator(
@@ -68,9 +69,9 @@ class RAGOrchestrator:
             logger=self.logger
         )
         self.generator = LLMGenerator(
-            model_path=self.config.get("model_path", "models/fine_tuned_models/opus-mt-it-en"),
-            adapter_path=self.config.get("adapter_path", None),
-            tokenizer_path=self.config.get("tokenizer_path", None),
+            model_path="facebook/mbart-large-50", #self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
+            #adapter_path=self.config.get("adapter_path", "models/fine_tuned_models/opus-mt-it-en-v1/model"),
+            #tokenizer_path=self.config.get("tokenizer_path", "models/fine_tuned_models/opus-mt-it-en-v1/tokenizer"),
             model_type="seq2seq",
             max_length=self.config.get("max_length", 128),
             device=self.config.get("device", "auto"),
@@ -121,7 +122,7 @@ class RAGOrchestrator:
             self.logger.error("File processing failed for %s: %s", file_path, str(e))
             return False
 
-    def process_query(self, query: str, top_k: int = 5) -> str:
+    def process_query(self, query: str, top_k: int = 5) -> Dict[str, Any]:
         """
         Process a user query and generate a response.
 
@@ -130,14 +131,14 @@ class RAGOrchestrator:
             top_k (int): Number of chunks to retrieve.
 
         Returns:
-            str: Generated response in Italian.
+            Dict[str, Any]: Dictionary with query, response, and contexts.
         """
         try:
             # Generate query embedding
             query_result = self.embedder.process_query(query)
             if not query_result["is_valid"]:
                 self.logger.error("Query embedding failed: %s", query_result["error"])
-                return f"Error: {query_result['error']}"
+                return {"query": query, "response": f"Error: {query_result['error']}", "contexts": []}
 
             # Retrieve relevant chunks
             contexts = self.retriever.retrieve(query, top_k)
@@ -150,25 +151,97 @@ class RAGOrchestrator:
             response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 50))
             self.logger.info("Generated response: %s...", response[:100])
 
-            # Save response
-            output_path = Path(self.config["data"]["destination"]) / f"response_{hash(query)}.json"
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump({"query": query, "response": response, "contexts": contexts}, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved response to %s", output_path)
-            return response
+            return {"query": query, "response": response, "contexts": contexts}
         except Exception as e:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
-            return f"Error: {str(e)}"
+            return {"query": query, "response": f"Error: {str(e)}", "contexts": []}
+
+    def process_queries_from_file(
+        self, 
+        queries_file: Union[Path, str], 
+        output_path: Union[Path, str], 
+        top_k: int = 5, 
+        extended: bool = False
+    ) -> bool:
+        """
+        Process queries from a JSON file and save results to output JSON.
+
+        Args:
+            queries_file (Union[Path, str]): Path to JSON file with queries.
+            output_path (Union[Path, str]): Path to save output JSON.
+            top_k (int): Number of chunks to retrieve per query.
+            extended (bool): If True, include top-k chunks in output JSON and print to console.
+
+        Returns:
+            bool: True if processing is successful, False otherwise.
+        """
+        try:
+            # Read queries from JSON
+            queries_file = Path(queries_file)
+            if not queries_file.exists():
+                self.logger.error("Queries file not found: %s", queries_file)
+                return False
+
+            with open(queries_file, "r", encoding="utf-8") as f:
+                queries_data = json.load(f)
+
+            results = []
+            for item in queries_data:
+                if "Italian" not in item:
+                    self.logger.warning("Skipping item without 'Italian' field: %s", item)
+                    continue
+                query = item["Italian"]
+                result = self.process_query(query, top_k)
+                # Include contexts in output JSON if extended is True
+                output_item = {
+                    "query": query,
+                    "answer": result["response"]
+                }
+                if extended:
+                    output_item["contexts"] = [
+                        {
+                            "chunk_id": context["chunk_id"],
+                            "text": context["text"],
+                            "distance": context["distance"]
+                        } for context in result["contexts"]
+                    ]
+
+                results.append(output_item)
+
+                # Print extended output to console if requested
+                if extended:
+                    self.logger.info("Query: %s", query)
+                    self.logger.info("Answer: %s", result["response"])
+                    self.logger.info("Top-%d closest chunks:", top_k)
+                    for i, context in enumerate(result["contexts"], 1):
+                        self.logger.info("Chunk %d:", i)
+                        self.logger.info("  Chunk ID: %s", context["chunk_id"])
+                        self.logger.info("  Text: %s...", context["text"][:100])
+                        self.logger.info("  Distance: %.4f", context["distance"])
+                    self.logger.info("-" * 50)
+
+            # Save results to JSON
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False, indent=2)
+            self.logger.info("Saved query responses to %s", output_path)
+            return True
+        except Exception as e:
+            self.logger.error("Failed to process queries from %s: %s", queries_file, str(e))
+            return False
 
 def main():
     parser = argparse.ArgumentParser(description="RAG Pipeline Orchestrator")
-    parser.add_argument("--query", type=str, required=True, help="User query in Italian")
+    parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text, or image)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
+    parser.add_argument("--output", type=str, default="data/results/responses.json", help="Path to save query responses")
+    parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 
     orchestrator = RAGOrchestrator(config_path=args.config)
-    
+
     # Process file if provided
     if args.file:
         success = orchestrator.process_file(args.file)
@@ -176,9 +249,16 @@ def main():
             print(f"Failed to process file: {args.file}")
             return
 
-    # Process query
-    response = orchestrator.process_query(args.query)
-    print(f"Response: {response}")
+    # Process queries from file if provided
+    if args.queries_file:
+        success = orchestrator.process_queries_from_file(queries_file=args.queries_file,
+                                                         output_path=args.output, extended=args.extended)
+        if success:
+            print(f"Successfully processed queries from {args.queries_file} and saved to {args.output}")
+        else:
+            print(f"Failed to process queries from {args.queries_file}")
+    else:
+        print("No queries file provided. Use --queries_file to specify a JSON file with queries.")
 
 if __name__ == "__main__":
     main()

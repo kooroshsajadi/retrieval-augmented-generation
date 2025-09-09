@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from src.retrieval.milvus_connector import MilvusConnector
 from src.retrieval.query_encoder import QueryEncoder
 from src.utils.logging_utils import setup_logger
@@ -13,7 +13,7 @@ class MilvusRetriever:
         embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2",
         milvus_host: str = "localhost",
         milvus_port: str = "19530",
-        logger: logging.Logger = None
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize MilvusRetriever.
