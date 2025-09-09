@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 from sentence_transformers import SentenceTransformer
 from src.utils.logging_utils import setup_logger
 import torch
@@ -10,7 +10,7 @@ class QueryEncoder:
     def __init__(
         self,
         embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2",
-        logger: logging.Logger = None
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize QueryEncoder.
