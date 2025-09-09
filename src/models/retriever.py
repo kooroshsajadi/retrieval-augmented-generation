@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing import List, Tuple
 
+# TODO: Adapt the main retrieval to this interface.
+
 class Retriever(ABC):
     """Abstract base class for retrieval models, defining the interface for document retrieval."""
     

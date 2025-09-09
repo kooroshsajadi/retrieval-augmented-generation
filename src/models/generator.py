@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import List
 
+
+# TODO: Adapt the main generation to this interface.
+
 class Generator(ABC):
     """Abstract base class for generation models, defining the interface for text generation."""
     

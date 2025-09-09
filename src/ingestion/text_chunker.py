@@ -1,8 +1,9 @@
 import json
 import re
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 import yaml
+import logging
 from src.utils.logging_utils import setup_logger
 
 class TextChunker:
@@ -14,6 +15,7 @@ class TextChunker:
         output_dir: str = "data/chunked_text",
         max_chunk_words: int = 500,
         min_chunk_length: int = 10,
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize TextChunker with configuration parameters.
@@ -28,7 +30,7 @@ class TextChunker:
         self.output_dir = Path(output_dir)
         self.max_chunk_words = max_chunk_words
         self.min_chunk_length = min_chunk_length
-        self.logger = setup_logger("text_chunker")
+        self.logger = logger or setup_logger("src.ingestion.text_chunker")
 
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
