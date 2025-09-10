@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pymilvus import connections, Collection
 from src.utils.logging_utils import setup_logger
 
@@ -11,7 +11,7 @@ class MilvusConnector:
         collection_name: str = "legal_texts",
         milvus_host: str = "localhost",
         milvus_port: str = "19530",
-        logger: logging.Logger = None
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize MilvusConnector.
