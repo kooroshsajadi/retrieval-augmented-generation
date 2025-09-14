@@ -27,7 +27,7 @@ def extract_text_with_pdfplumber(file_path: Path) -> Tuple[str, List[Dict], bool
                 page_metadata.append({"page_number": i + 1, "text_length": text_length})
         success = len(text.strip()) > 0
         return text, page_metadata, success
-    except (pdfplumber.PDFSyntaxError, FileNotFoundError) as e:
+    except Exception as e: # TODO: Add error logging
         return "", [], False  # Empty metadata list for errors
 
 def extract_text_with_ocr(file_path: Path, language: str = 'ita') -> Tuple[str, List[Dict], bool]:
@@ -52,7 +52,7 @@ def extract_text_with_ocr(file_path: Path, language: str = 'ita') -> Tuple[str, 
             page_metadata.append({"page_number": i + 1, "text_length": text_length})
         success = len(text.strip()) > 0
         return text, page_metadata, success
-    except (FileNotFoundError, pytesseract.TesseractError) as e:
+    except Exception as e:
         return "", [], False
 
 def extract_text_from_txt(file_path: Path) -> Tuple[str, List[Dict], bool]:
@@ -93,5 +93,5 @@ def extract_text_image_with_pymupdf(file_path: Path) -> Tuple[str, List[Dict], b
         doc.close()
         pix = None
         return text, [{"page_number": 1, "text_length": text_length}], text_length > 0
-    except (fitz.FileDataError, fitz.EmptyFileError) as e:
+    except (fitz.FileDataError, fitz.EmptyFileError) as e: # TODO: Add error logging
         return "", [], False

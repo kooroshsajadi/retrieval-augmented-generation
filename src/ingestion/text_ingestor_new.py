@@ -1,16 +1,19 @@
 import json
 from pathlib import Path
-from src.utils.ingestion_metadata import IngestionMetadata, FileType
+from src.utils.ingestion.ingestion_metadata import IngestionMetadata, FileType, PDFType
 from src.utils.ingestion.source_classifier import SourceClassifier
 import src.utils.ingestion.text_ingestors as ext
-from typing import Optional
+from typing import Dict, List, Optional
 from src.utils.logging_utils import setup_logger
 import logging
 
 
 class TextIngestor:
-    def __init__(self, input_dir, output_dir, output_metadata_file,
-                 language="ita", logger:Optional[logging.Logger]=None):
+    def __init__(self, input_dir,
+                 output_dir,
+                 output_metadata_file,
+                 language="ita",
+                 logger:Optional[logging.Logger]=None):
         
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
@@ -19,64 +22,135 @@ class TextIngestor:
         self.language = language
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logger or setup_logger("src.ingestion.text_ingestor")
+        # Dispatch table for file type to extraction function
+        self._extraction_methods = {
+            FileType.PDF: self._extract_pdf,
+            FileType.P7M: self._extract_pdf,  # P7M treated like PDF
+            FileType.TXT: ext.extract_text_from_txt,
+            FileType.IMAGE: ext.extract_text_image_with_pymupdf,
+        }
+
+    def _extract_pdf(self, file_path: Path, meta: IngestionMetadata) -> tuple[str, List, bool]:
+        """Extract text from a PDF file based on its pdf_type."""
+        meta.pdf_type = self.classifier.classify_pdf_type(file_path)
+        if meta.pdf_type == PDFType.TEXT_BASED:
+            return ext.extract_text_with_pdfplumber(file_path)
+        return ext.extract_text_with_ocr(file_path, language=self.language)
+
+    def _save_extracted_text(self, text: str, file_path: Path, meta: IngestionMetadata) -> None:
+        """Save extracted text to file if valid and non-empty."""
+        if meta.is_valid and text and text.strip():
+            out_path = self.output_dir / (file_path.stem + ".txt")
+            out_path.write_text(text, encoding="utf-8")
+            self.logger.info(f"Text extraction was successful for {file_path.name}")
+        elif meta.is_valid and (not text or not text.strip()):
+            self.logger.warning(f"No text extracted from {file_path.name} but not marked as invalid.")
+
+    def _convert_metadata_to_dict(self, meta: IngestionMetadata) -> Dict:
+        """Convert metadata object to dictionary, converting enums to their values."""
+        meta_dict = meta.__dict__.copy()
+        if isinstance(meta_dict.get("file_type"), FileType):
+            meta_dict["file_type"] = meta_dict["file_type"].value
+        if isinstance(meta_dict.get("pdf_type"), PDFType):
+            meta_dict["pdf_type"] = meta_dict["pdf_type"].value
+        return meta_dict
 
     def process_directory(self):
+        """
+        Process all files in the input directory, classify them, extract text, and save metadata.
+
+        Iterates through files in the input directory, classifies each file using the classifier,
+        extracts text based on file type, saves the extracted text to the output directory,
+        and stores metadata in a JSON file. Unsupported files are logged and included in metadata
+        with an error message.
+
+        Attributes:
+            input_dir (Path): Directory containing input files to process.
+            output_dir (Path): Directory to save extracted text files.
+            output_metadata_file (Path): Path to save the aggregated metadata JSON.
+            language (str): Language for OCR (used for image-based PDFs).
+            classifier: Object with methods to classify file types and PDF types.
+            logger: Logger instance for logging info, warnings, and errors.
+
+        Notes:
+            - Supported file types are PDF (.pdf, .p7m), text files (e.g., .txt), and images (e.g., .png).
+            - PDFs are further classified as text-based or image-based to determine extraction method.
+            - Metadata is saved as JSON with enum values converted to strings.
+            - Empty or invalid text extractions are logged but do not halt processing.
+        """
         aggregated_metadata = []
         for file_path in self.input_dir.iterdir():
             if not file_path.is_file():
                 continue
-            cls = self.classifier.classify_file(file_path)
+
+            # Classify file and initialize metadata
+            cls_meta = self.classifier.classify_file(file_path)
             meta = IngestionMetadata(
                 file_path=str(file_path),
                 file_name=file_path.name,
-                file_type=FileType(cls["file_type"]) if cls["file_type"] in FileType._value2member_map_ else FileType.UNKNOWN,
+                file_type=cls_meta.file_type,
+                is_supported=cls_meta.is_supported,
+                error=cls_meta.error,
                 page_metadata=[],
-                is_valid=True,
-                error=None
+                is_valid=True if cls_meta.is_supported else False
             )
-            if not cls["is_supported"]:
-                meta.error = cls["error"]
-                meta.is_valid = False
-                meta.page_metadata = []
+
+            # Handle unsupported files
+            if not meta.is_supported:
                 self.logger.warning("Unsupported file type for %s", file_path.name)
             else:
-                if meta.file_type == FileType.PDF:
-                    text, page_md, valid = ext.extract_text_with_pdfplumber(file_path)
-                    if not valid:
-                        text, page_md, valid = ext.extract_text_with_ocr(file_path, language=self.language)
-                elif meta.file_type == FileType.TXT:
-                    text, page_md, valid = ext.extract_text_from_txt(file_path)
-                elif meta.file_type == FileType.IMAGE:
-                    text, page_md, valid = ext.extract_text_image_with_pymupdf(file_path)
+                # Extract text using dispatch table
+                extraction_method = self._extraction_methods.get(meta.file_type)
+                if extraction_method:
+                    text, meta.page_metadata, meta.is_valid = extraction_method(file_path, meta)
+                    if not meta.is_valid:
+                        self.logger.error("Text extraction failed for %s", file_path.name)
+                    self._save_extracted_text(text, file_path, meta)
                 else:
-                    text, page_md, valid = "", [], False
-                meta.page_metadata = page_md
-                if not valid:
-                    meta.is_valid = False
-                    self.logger.warning("Text extraction failed for %s", file_path.name)
-            # Save extracted text only if not empty (independent of meta.is_valid)
-            if len(text.strip()) > 0:
-                out_path = self.output_dir / (file_path.stem + ".txt")
-                out_path.write_text(text, encoding="utf-8")
-                self.logger.info(f"Text extraction was successful for {file_path.name}")
-            else:
-                self.logger.warning(f"No text extracted from {file_path.name} but not marked as invalid.")
-            # Convert enum fields to their value before appending
-            meta_dict = meta.__dict__.copy()
-            if isinstance(meta_dict.get("file_type"), FileType):
-                meta_dict["file_type"] = meta_dict["file_type"].value
-            aggregated_metadata.append(meta_dict)
-    
+                    self.logger.error("No extraction method for file type %s", meta.file_type)
+
+            # Convert and store metadata
+            aggregated_metadata.append(self._convert_metadata_to_dict(meta))
+
+        # Save aggregated metadata to JSON
         with open(self.output_metadata_file, "w", encoding="utf-8") as f:
             json.dump(aggregated_metadata, f, ensure_ascii=False, indent=2)
-
-
+        #     else:
+        #         if meta.file_type == FileType.PDF or FileType.P7M:
+        #             meta.pdf_type = self.classifier.classify_pdf_type(file_path)
+        #             if meta.pdf_type == PDFType.TEXT_BASED.value:
+        #                 text, meta.page_metadata, meta.is_valid = ext.extract_text_with_pdfplumber(file_path)
+        #             else:
+        #                 text, meta.page_metadata, meta.is_valid = ext.extract_text_with_ocr(file_path, language=self.language)
+        #         elif meta.file_type == FileType.TXT:
+        #             text, meta.page_metadata, meta.is_valid = ext.extract_text_from_txt(file_path)
+        #         elif meta.file_type == FileType.IMAGE:
+        #             text, meta.page_metadata, meta.is_valid = ext.extract_text_image_with_pymupdf(file_path)
+        #         if not meta.is_valid:
+        #             self.logger.error("Text extraction failed for %s", file_path.name)
+        #         # Save extracted text only if not empty (independent of meta.is_valid)
+        #         if meta.is_valid and text and len(text.strip()) > 0:
+        #             out_path = self.output_dir / (file_path.stem + ".txt")
+        #             out_path.write_text(text, encoding="utf-8")
+        #             self.logger.info(f"Text extraction was successful for {file_path.name}")
+        #         elif meta.is_valid and (not text or len(text.strip()) == 0):
+        #             self.logger.warning(f"No text extracted from {file_path.name} but not marked as invalid.")
+        #     # Convert enum fields to their value before appending
+        #     meta_dict = meta.__dict__.copy()
+        #     if isinstance(meta_dict.get("file_type"), FileType):
+        #         meta_dict["file_type"] = meta_dict["file_type"].value
+        #     if isinstance(meta_dict.get("pdf_type"), PDFType):
+        #         meta_dict["pdf_type"] = meta_dict["pdf_type"].value
+        #     aggregated_metadata.append(meta_dict)
+    
+        # with open(self.output_metadata_file, "w", encoding="utf-8") as f:
+        #     json.dump(aggregated_metadata, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     ingestor = TextIngestor(
-        input_dir=Path("data/prefettura_v1_files"),
-        output_dir=Path("data/prefettura_v1.3_texts"),
-        output_metadata_file=Path("data/metadata/extraction_prefettura_v1.3.json"),
+        input_dir=Path("data/test/files_unsupported"),
+        output_dir=Path("data/test/texts_unsupported"),
+        output_metadata_file=Path("data/metadata/extraction_prefettura_v1.3_test.json"),
         language='ita'
     )
     ingestor.process_directory()
