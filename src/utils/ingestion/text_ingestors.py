@@ -43,7 +43,7 @@ def extract_text_with_ocr(file_path: Path, language: str = 'ita') -> Tuple[str, 
     """
     text, page_metadata = "", []
     try:
-        images = convert_from_path(pdf_path=file_path, dpi=400, first_page=1, use_pdftocairo=True)
+        images = convert_from_path(pdf_path=file_path, dpi=300, first_page=1, use_pdftocairo=True)
         for i, image in enumerate(images):
             image = ImageEnhance.Contrast(image).enhance(2.0)
             page_text = pytesseract.image_to_string(image, lang=language) or ""
@@ -87,7 +87,7 @@ def extract_text_image_with_pymupdf(file_path: Path) -> Tuple[str, List[Dict], b
         doc = fitz.open()
         page = doc.new_page(width=pix.width, height=pix.height)
         page.insert_image(page.rect, pixmap=pix)
-        textpage = page.get_textpage_ocr(dpi=400, full=True)
+        textpage = page.get_textpage_ocr(dpi=300, full=True)
         text = page.get_text(textpage=textpage)
         text_length = len(text)
         doc.close()
