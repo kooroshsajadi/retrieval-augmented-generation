@@ -24,18 +24,26 @@ class TextIngestor:
         self.logger = logger or setup_logger("src.ingestion.text_ingestor")
         # Dispatch table for file type to extraction function
         self._extraction_methods = {
-            FileType.PDF: self._extract_pdf,
-            FileType.P7M: self._extract_pdf,  # P7M treated like PDF
-            FileType.TXT: ext.extract_text_from_txt,
-            FileType.IMAGE: ext.extract_text_image_with_pymupdf,
+            FileType.PDF: self._extract_pdf_wrapper,
+            FileType.P7M: self._extract_pdf_wrapper,  # P7M treated like PDF
+            FileType.TXT: self._extract_text_wrapper,
+            FileType.IMAGE: self._extract_image_wrapper,
         }
 
-    def _extract_pdf(self, file_path: Path, meta: IngestionMetadata) -> tuple[str, List, bool]:
+    def _extract_pdf_wrapper(self, file_path: Path, meta: IngestionMetadata) -> tuple[str, List, bool]:
         """Extract text from a PDF file based on its pdf_type."""
         meta.pdf_type = self.classifier.classify_pdf_type(file_path)
         if meta.pdf_type == PDFType.TEXT_BASED:
             return ext.extract_text_with_pdfplumber(file_path)
         return ext.extract_text_with_ocr(file_path, language=self.language)
+    
+    def _extract_text_wrapper(self, file_path: Path, meta: IngestionMetadata) -> tuple[str, List, bool]:
+        """Extract text from a text file."""
+        return ext.extract_text_from_txt(file_path)
+    
+    def _extract_image_wrapper(self, file_path: Path, meta: IngestionMetadata) -> tuple[str, List, bool]:
+        """Extract text from an image file."""
+        return ext.extract_text_image_with_pymupdf(file_path)
 
     def _save_extracted_text(self, text: str, file_path: Path, meta: IngestionMetadata) -> None:
         """Save extracted text to file if valid and non-empty."""
@@ -148,9 +156,9 @@ class TextIngestor:
 
 if __name__ == "__main__":
     ingestor = TextIngestor(
-        input_dir=Path("data/test/files_unsupported"),
-        output_dir=Path("data/test/texts_unsupported"),
-        output_metadata_file=Path("data/metadata/extraction_prefettura_v1.3_test.json"),
+        input_dir=Path("data/prefettura_v1_files"),
+        output_dir=Path("data/prefettura_v1.3_texts"),
+        output_metadata_file=Path("data/metadata/extraction_prefettura_v1.3.json"),
         language='ita'
     )
     ingestor.process_directory()
