@@ -3,9 +3,10 @@ from typing import Dict, List, Any
 from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from src.models.embeddings import EmbeddingModels
 import yaml
 from src.utils.logging_utils import setup_logger
-
+    
 class EmbeddingGenerator:
     """Generates vector embeddings for chunked text using SentenceTransformer."""
 
@@ -200,10 +201,10 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks'].get('prefettura_v1.2', 'data/chunks/prefettura_v1.2_chunks'),
-            output_dir=config['embeddings'].get('prefettura_v1.2', 'data/embeddings/prefettura_v1.2_embeddings'),
-            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.2', 'data/metadata/chunking_prefettura_v1.2.json'),
-            model_name=config.get('embedding_model', 'intfloat/multilingual-e5-large')
+            input_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
+            output_dir=config['embeddings'].get('prefettura_v1.3', 'data/embeddings/prefettura_v1.3_embeddings'),
+            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3', 'data/metadata/chunking_prefettura_v1.3_chunks.json'),
+            model_name=EmbeddingModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value
         )
         generator.process_directory()
         print("Embedding generation completed.")
