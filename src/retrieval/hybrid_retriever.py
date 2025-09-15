@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from rank_bm25 import BM25Okapi
 from src.retrieval.milvus_connector import MilvusConnector
 from src.retrieval.query_encoder import QueryEncoder
@@ -11,7 +11,7 @@ class HybridRetriever:
         milvus_connector: MilvusConnector,
         query_encoder: QueryEncoder,
         collection_name: str,
-        logger: logging.Logger
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize HybridRetriever.
@@ -20,12 +20,12 @@ class HybridRetriever:
             milvus_connector (MilvusConnector): Milvus connector instance.
             query_encoder (QueryEncoder): Query encoder instance.
             collection_name (str): Milvus collection name.
-            logger (logging.Logger): Logger instance.
+            logger: Optional[logging.Logger]: Optional logger instance.
         """
         self.milvus_connector = milvus_connector
         self.query_encoder = query_encoder
         self.collection_name = collection_name
-        self.logger = logger
+        self.logger = logger or logging.getLogger("src.retrieval.hybrid_retriever")
         self.bm25 = None
         self._initialize_bm25()
 

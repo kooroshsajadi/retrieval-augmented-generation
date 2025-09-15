@@ -1,10 +1,11 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sentence_transformers import CrossEncoder
+from src.utils.logging_utils import setup_logger
 
 class Reranker:
     """Reranks retrieved chunks using a cross-encoder model."""
-    def __init__(self, model_name: str, logger: logging.Logger):
+    def __init__(self, model_name: str, logger: Optional[logging.Logger] = None):
         """
         Initialize Reranker.
 
@@ -13,7 +14,7 @@ class Reranker:
             logger (logging.Logger): Logger instance.
         """
         self.model = CrossEncoder(model_name, max_length=512)
-        self.logger = logger
+        self.logger = logger or setup_logger("src.retrieval.reranker")
         self.logger.info(f"Loaded cross-encoder model: {model_name}")
 
     def rerank(self, query: str, chunks: List[Dict[str, Any]], top_k: int) -> List[Dict[str, Any]]:
