@@ -23,7 +23,7 @@ class MilvusConnector:
             milvus_port (str): Milvus server port.
             logger (logging.Logger, optional): Logger instance.
         """
-        self.logger = logger or setup_logger(__name__)
+        self.logger = logger or setup_logger("src.retrieval.milvus_connector")
         self.collection_name = collection_name
 
         # Connect to Milvus

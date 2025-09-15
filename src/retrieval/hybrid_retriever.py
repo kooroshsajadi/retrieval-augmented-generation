@@ -30,11 +30,9 @@ class HybridRetriever:
         self._initialize_bm25()
 
     def _initialize_bm25(self):
-        """Initialize BM25 index with texts from Milvus collection."""
         try:
-            # Fetch all texts from Milvus (assumes text field exists in collection)
-            texts, ids = self.milvus_connector.get_all_texts(self.collection_name)
-            tokenized_texts = [text.split() for text in texts]  # Simple tokenization
+            texts, ids = self.milvus_connector.get_all_texts()
+            tokenized_texts = [text.split() for text in texts]
             self.bm25 = BM25Okapi(tokenized_texts)
             self.texts = texts
             self.ids = ids
