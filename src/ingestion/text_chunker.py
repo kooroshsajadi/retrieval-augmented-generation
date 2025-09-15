@@ -224,7 +224,7 @@ class TextChunker:
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
 
         # Save all metadata in a single summary JSON file
-        summary_file = self.output_dir / "chunking_summary.json"
+        summary_file = "data/metadata/chunking_prefettura_v1.3_chunks.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
