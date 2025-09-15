@@ -1,9 +1,8 @@
 import argparse
-import logging
 import yaml
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union
+from typing import Dict, Any, Union
 import numpy as np
 from src.utils.logging_utils import setup_logger
 from scripts.validate_data import DataValidator
