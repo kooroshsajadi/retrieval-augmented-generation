@@ -1,23 +1,24 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 import torch
 import logging
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, AutoModel, AutoTokenizer, AutoConfig
 from src.utils.logging_utils import setup_logger
 from peft import PeftModel
 
 logger = setup_logger(__name__)
 
 class ModelLoader:
-    """Model loader for inference in RAG pipeline, optimized for seq2seq models."""
+    """Model loader for inference in RAG pipeline, supporting seq2seq and encoder-only models."""
 
     MODEL_TYPE_MAPPING = {
-        "seq2seq": AutoModelForSeq2SeqLM
+        "seq2seq": AutoModelForSeq2SeqLM,
+        "encoder-only": AutoModel
     }
 
     def __init__(
         self,
-        model_name: str = "model/opus-mt-it-en",
+        model_name: str = "Helsinki-NLP/opus-mt-it-en",
         model_type: str = "seq2seq",
         device_map: str = "auto",
         adapter_path: Optional[str] = None,
@@ -30,8 +31,10 @@ class ModelLoader:
 
         Args:
             model_name (str): Path to model or Hugging Face model name.
-            model_type (str): Model type ("seq2seq").
+            model_type (str): Model type ("seq2seq" or "encoder-only").
             device_map (str): Device placement ("auto", "cpu", "xpu").
+            adapter_path (Optional[str]): Path to LoRA adapters for fine-tuning.
+            tokenizer_path (Optional[str]): Path to tokenizer, defaults to model_name.
             max_length (int): Maximum sequence length for tokenization.
             logger (logging.Logger, optional): Logger instance.
         """
@@ -40,8 +43,26 @@ class ModelLoader:
         self.max_length = max_length
         self.logger = logger or setup_logger(__name__)
 
+        # Validate model_type
         if self.model_type not in self.MODEL_TYPE_MAPPING:
             raise ValueError(f"Unsupported model_type: {self.model_type}. Choose from {list(self.MODEL_TYPE_MAPPING.keys())}")
+
+        # Detect model type from configuration if not specified
+        try:
+            config = AutoConfig.from_pretrained(model_name, trust_remote_code=False)
+            if self.model_type == "seq2seq" and not any(isinstance(config, cls) for cls in [
+                AutoModelForSeq2SeqLM._model_mapping.keys()
+            ]):
+                self.logger.warning(f"Model {model_name} has config {type(config).__name__}, which is not seq2seq. Switching to encoder-only.")
+                self.model_type = "encoder-only"
+            elif self.model_type == "encoder-only" and not any(isinstance(config, cls) for cls in [
+                AutoModel._model_mapping.keys()
+            ]):
+                self.logger.warning(f"Model {model_name} has config {type(config).__name__}, which is not encoder-only. Switching to seq2seq.")
+                self.model_type = "seq2seq"
+        except Exception as e:
+            self.logger.error(f"Failed to load config for {model_name}: {str(e)}")
+            raise
 
         # Set device
         self.use_gpu = torch.cuda.is_available() or torch.xpu.is_available()
@@ -67,12 +88,14 @@ class ModelLoader:
             self.logger.error(f"Failed to load model {model_name}: {str(e)}")
             raise
 
+        # Load LoRA adapters if provided
         if adapter_path:
             try:
                 self.model = PeftModel.from_pretrained(base_model, adapter_path).to(self.device)
-                self.logger.info(f"Loaded base model {model_name} with adapter from{adapter_path}")
+                self.logger.info(f"Loaded base model {model_name} with adapter from {adapter_path}")
             except Exception as e:
                 self.logger.error(f"Failed to load adapter model from {adapter_path}: {str(e)}")
+                raise
         else:
             self.model = base_model
             self.logger.info(f"Loaded base model {model_name} without adapter")
@@ -88,7 +111,7 @@ class ModelLoader:
 
         self.model.eval()
 
-        # Load tokenizer from tokenizer_name if given, else from model_name
+        # Load tokenizer
         tokenizer_source = tokenizer_path if tokenizer_path is not None else model_name
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -149,8 +172,20 @@ class ModelLoader:
             f"- Approx parameter memory: {mem_mb:.2f}MB ({mem_gb:.3f}GB)"
         )
 
-    def generate(self, text: str, max_new_tokens: int = 50) -> str:
-        """Generate translation or response for seq2seq model."""
+    def generate(self, text: str, max_new_tokens: int = 50) -> Union[str, torch.Tensor]:
+        """
+        Generate output for seq2seq or encoder-only models.
+
+        For seq2seq models, generates text (e.g., translation or summary).
+        For encoder-only models, returns embeddings (mean-pooled hidden states).
+
+        Args:
+            text (str): Input text.
+            max_new_tokens (int): Maximum new tokens for seq2seq generation.
+
+        Returns:
+            Union[str, torch.Tensor]: Generated text for seq2seq, embeddings for encoder-only.
+        """
         try:
             inputs = self.tokenizer(
                 text,
@@ -159,14 +194,21 @@ class ModelLoader:
                 truncation=True,
                 max_length=self.max_length
             ).to(self.device)
+
             with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=max_new_tokens,
-                    num_beams=5,
-                    early_stopping=True
-                )
-            return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                if self.model_type == "seq2seq":
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_new_tokens=max_new_tokens,
+                        num_beams=5,
+                        early_stopping=True
+                    )
+                    return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+                else:  # encoder-only
+                    outputs = self.model(**inputs)
+                    # Return mean-pooled embeddings (CLS token or mean of hidden states)
+                    embeddings = outputs.last_hidden_state.mean(dim=1).squeeze()
+                    return embeddings
         except Exception as e:
             self.logger.error(f"Failed to generate: {str(e)}")
             raise
