@@ -8,7 +8,7 @@ from src.utils.logging_utils import setup_logger
 import logging
 
 
-class TextIngestor:
+class TextExtractor:
     def __init__(self, input_dir,
                  output_dir,
                  output_metadata_file,
@@ -21,7 +21,7 @@ class TextIngestor:
         self.classifier = SourceClassifier()
         self.language = language
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.logger = logger or setup_logger("src.ingestion.text_ingestor")
+        self.logger = logger or setup_logger("src.ingestion.text_extractor")
         # Dispatch table for file type to extraction function
         self._extraction_methods = {
             FileType.PDF: self._extract_pdf_wrapper,
@@ -155,11 +155,11 @@ class TextIngestor:
         #     json.dump(aggregated_metadata, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
-    ingestor = TextIngestor(
+    extractor = TextExtractor(
         input_dir=Path("data/prefettura_v1_files"),
         output_dir=Path("data/prefettura_v1.3_texts"),
         output_metadata_file=Path("data/metadata/extraction_prefettura_v1.3.json"),
         language='ita'
     )
-    ingestor.process_directory()
-    print("Text ingestion and classification completed. Metadata saved.")
+    extractor.process_directory()
+    print("Text extraction and classification completed. Metadata saved.")
