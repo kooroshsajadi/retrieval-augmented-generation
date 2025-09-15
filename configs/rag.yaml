@@ -2,8 +2,8 @@ data:
   source: data/source
   texts: data/texts
   cleaned_texts: data/cleaned_texts
-  chunks: data/chunks/prefettura_v1.2_chunks
-  embeddings: data/embeddings/prefettura_v1.2_embeddings
+  chunks: data/chunks/prefettura_v1.3_chunks
+  embeddings: data/embeddings/prefettura_v1.3_embeddings
   destination: data/results
 supported_formats:
   - .text
@@ -18,7 +18,7 @@ embedding_dim: 1024
 collection_name: gotmat_collection
 milvus_host: localhost
 milvus_port: 19530
-model_path: Helsinki-NLP/opus-mt-it-en
+model_path: facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
 adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
 tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
 max_length: 512

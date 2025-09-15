@@ -12,6 +12,9 @@ from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
 from src.augmentation.augmenter import Augmenter
+from src.models.cross_encoders import CrossEncoderModels
+from src.models.bi_encoders import BiEncoderModels
+from src.models.llms import LargeLanguageModels
 
 class RAGOrchestrator:
     """Orchestrates the RAG pipeline for processing user queries and files."""
@@ -40,7 +43,7 @@ class RAGOrchestrator:
             logger=self.logger
         )
         self.embedder = SentenceTransformerEmbedder(
-            model_name=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
+            model_name=self.config.get("embedding_modell", BiEncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value),
             output_dir=self.config["data"]["embeddings"],
             max_chunk_words=self.config.get("max_chunk_words", 500),
             min_chunk_length=self.config.get("min_chunk_length", 10),
@@ -51,24 +54,25 @@ class RAGOrchestrator:
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
             embedding_dim=self.config.get("embedding_dim", 1024),
-            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.2_chunks"),
-            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.2_embeddings"),
+            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3_chunks"),
+            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3_embeddings"),
             logger=self.logger
         )
         self.retriever = MilvusRetriever(
             collection_name=self.config.get("collection_name", "gotmat_collection"),
-            embedding_model=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
+            embedding_model=self.config.get("embedding_modell", BiEncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
+            reranker_model=CrossEncoderModels.MS_MARCO_MINILM_L12_V2.value,
             logger=self.logger
         )
         self.augmenter = Augmenter(
             max_contexts=self.config.get("max_contexts", 5),
-            max_context_length=self.config.get("max_context_length", 1000),
+            max_context_length=self.config.get("max_context_lengthh", 1500),
             logger=self.logger
         )
         self.generator = LLMGenerator(
-            model_path="facebook/mbart-large-50", #self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
+            model_path=LargeLanguageModels.ITALIAN_LEGAL_BERT_SC.value, #self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
             #adapter_path=self.config.get("adapter_path", "models/fine_tuned_models/opus-mt-it-en-v1/model"),
             #tokenizer_path=self.config.get("tokenizer_path", "models/fine_tuned_models/opus-mt-it-en-v1/tokenizer"),
             model_type="seq2seq",
@@ -147,7 +151,7 @@ class RAGOrchestrator:
             prompt = self.augmenter.augment(query, contexts)
 
             # Generate response
-            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 50))
+            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokenss", 100))
             self.logger.info("Generated response: %s...", response[:100])
 
             return {"query": query, "response": response, "contexts": contexts}
@@ -201,7 +205,7 @@ class RAGOrchestrator:
                         {
                             "chunk_id": context["chunk_id"],
                             "text": context["text"],
-                            "distance": context["distance"]
+                            "score": context["score"]
                         } for context in result["contexts"]
                     ]
 
@@ -216,7 +220,7 @@ class RAGOrchestrator:
                         self.logger.info("Chunk %d:", i)
                         self.logger.info("  Chunk ID: %s", context["chunk_id"])
                         self.logger.info("  Text: %s...", context["text"][:100])
-                        self.logger.info("  Distance: %.4f", context["distance"])
+                        self.logger.info("  Score: %.4f", context["score"])
                     self.logger.info("-" * 50)
 
             # Save results to JSON
@@ -235,7 +239,7 @@ def main():
     parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text, or image)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_v1.3.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 

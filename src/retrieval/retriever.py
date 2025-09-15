@@ -4,7 +4,8 @@ from src.retrieval.milvus_connector import MilvusConnector
 from src.retrieval.query_encoder import QueryEncoder
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.retrieval.reranker import Reranker
-from src.models.embeddings import EmbeddingModels
+from src.models.cross_encoders import CrossEncoderModels
+from src.models.bi_encoders import BiEncoderModels
 from src.utils.logging_utils import setup_logger
 
 class MilvusRetriever:
@@ -12,10 +13,10 @@ class MilvusRetriever:
     def __init__(
         self,
         collection_name: str = "legal_texts",
-        embedding_model: str = EmbeddingModels.MMARCO_MINILM_L12_H384_V1.value,
+        embedding_model: str = BiEncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value,
         milvus_host: str = "localhost",
         milvus_port: str = "19530",
-        reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-12-v2",
+        reranker_model: str = CrossEncoderModels.MS_MARCO_MINILM_L12_V2.value,
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -64,7 +65,7 @@ class MilvusRetriever:
             # Step 1: Hybrid retrieval
             hybrid_results = self.hybrid_retriever.retrieve_hybrid(
                 query=query,
-                top_k=top_k * 2,  # Retrieve more candidates for reranking
+                top_k=top_k * 3,  # Retrieve more candidates for reranking
                 vector_weight=hybrid_weight
             )
             self.logger.info(f"Hybrid retrieval returned {len(hybrid_results)} chunks for query: {query[:50]}...")
