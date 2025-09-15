@@ -190,8 +190,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         cleaner = TextCleaner(
-            input_dir='data/prefettura_v1.2_texts', # Replace with your actual local address to the text files.
-            output_dir=config['cleaned_texts'].get('prefettura_v1.2', 'data/prefettura_v1.2_cleaned_texts'), # Replace with your desired local address to save the cleaned texts or change the second parameter.
+            input_dir='data/prefettura_v1.3_texts',
+            output_dir='data/prefettura_v1.3_cleaned_texts',
             min_text_length=20
         )
         cleaner.process_directory()
