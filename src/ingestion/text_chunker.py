@@ -238,8 +238,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         chunker = TextChunker(
-            input_dir=config['cleaned_texts'].get('prefettura_v1.2', 'data/prefettura_v1.2_cleaned_texts'),
-            output_dir=config['chunks'].get('prefettura_v1.2', 'data/chunks/prefettura_v1.2_chunks'),
+            input_dir=config['cleaned_texts'].get('prefettura_v1.3', 'data/prefettura_v1.3_cleaned_texts'),
+            output_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
             max_chunk_words=500,
             min_chunk_length=10
         )
