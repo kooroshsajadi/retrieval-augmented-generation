@@ -123,36 +123,6 @@ class TextExtractor:
         # Save aggregated metadata to JSON
         with open(self.output_metadata_file, "w", encoding="utf-8") as f:
             json.dump(aggregated_metadata, f, ensure_ascii=False, indent=2)
-        #     else:
-        #         if meta.file_type == FileType.PDF or FileType.P7M:
-        #             meta.pdf_type = self.classifier.classify_pdf_type(file_path)
-        #             if meta.pdf_type == PDFType.TEXT_BASED.value:
-        #                 text, meta.page_metadata, meta.is_valid = ext.extract_text_with_pdfplumber(file_path)
-        #             else:
-        #                 text, meta.page_metadata, meta.is_valid = ext.extract_text_with_ocr(file_path, language=self.language)
-        #         elif meta.file_type == FileType.TXT:
-        #             text, meta.page_metadata, meta.is_valid = ext.extract_text_from_txt(file_path)
-        #         elif meta.file_type == FileType.IMAGE:
-        #             text, meta.page_metadata, meta.is_valid = ext.extract_text_image_with_pymupdf(file_path)
-        #         if not meta.is_valid:
-        #             self.logger.error("Text extraction failed for %s", file_path.name)
-        #         # Save extracted text only if not empty (independent of meta.is_valid)
-        #         if meta.is_valid and text and len(text.strip()) > 0:
-        #             out_path = self.output_dir / (file_path.stem + ".txt")
-        #             out_path.write_text(text, encoding="utf-8")
-        #             self.logger.info(f"Text extraction was successful for {file_path.name}")
-        #         elif meta.is_valid and (not text or len(text.strip()) == 0):
-        #             self.logger.warning(f"No text extracted from {file_path.name} but not marked as invalid.")
-        #     # Convert enum fields to their value before appending
-        #     meta_dict = meta.__dict__.copy()
-        #     if isinstance(meta_dict.get("file_type"), FileType):
-        #         meta_dict["file_type"] = meta_dict["file_type"].value
-        #     if isinstance(meta_dict.get("pdf_type"), PDFType):
-        #         meta_dict["pdf_type"] = meta_dict["pdf_type"].value
-        #     aggregated_metadata.append(meta_dict)
-    
-        # with open(self.output_metadata_file, "w", encoding="utf-8") as f:
-        #     json.dump(aggregated_metadata, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     extractor = TextExtractor(
