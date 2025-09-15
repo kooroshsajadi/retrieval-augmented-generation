@@ -1,7 +1,8 @@
 import logging
-from typing import List, Dict, Any, Optional
-from pymilvus import connections, Collection
+from typing import List, Dict, Any, Optional, Tuple
+from pymilvus import connections, Collection, MilvusException
 from src.utils.logging_utils import setup_logger
+import time
 
 class MilvusConnector:
     """Handles connection and search operations for Milvus vector database."""
@@ -67,4 +68,64 @@ class MilvusConnector:
             return retrieved
         except Exception as e:
             self.logger.error(f"Search failed: {str(e)}")
+            raise
+
+    def get_all_texts(self) -> Tuple[List[str], List[str]]:
+        """
+        Retrieve all texts and their corresponding chunk IDs from the Milvus collection.
+
+        Returns:
+            Tuple[List[str], List[str]]: Lists of texts and chunk_ids.
+
+        Raises:
+            MilvusException: If the query fails after retries.
+        """
+        try:
+            texts = []
+            chunk_ids = []
+            offset = 0
+            limit = 1000  # Fetch in batches to handle large collections
+            retries = 3
+
+            while True:
+                for attempt in range(retries):
+                    try:
+                        # Query all entities with pagination
+                        result = self.collection.query(
+                            expr="",  # Empty expression to fetch all
+                            offset=offset,
+                            limit=limit,
+                            output_fields=["chunk_id", "text"]
+                        )
+                        # Extract texts and chunk_ids
+                        for hit in result:
+                            chunk_id = hit.get("chunk_id")
+                            text = hit.get("text", "")
+                            if text.strip():  # Skip empty texts
+                                texts.append(text)
+                                chunk_ids.append(chunk_id)
+                            else:
+                                self.logger.warning(f"Skipping empty text for chunk_id: {chunk_id}")
+
+                        offset += limit
+                        if len(result) < limit:  # No more data to fetch
+                            break
+                        break  # Exit retry loop on success
+                    except MilvusException as e:
+                        self.logger.error(f"Attempt {attempt + 1} to fetch texts failed: {str(e)}")
+                        if attempt < retries - 1:
+                            time.sleep(5)  # Wait before retry
+                            continue
+                        raise
+                    except Exception as e:
+                        self.logger.error(f"Unexpected error fetching texts: {str(e)}")
+                        raise
+
+                if len(result) < limit:
+                    break
+
+            self.logger.info(f"Retrieved {len(texts)} texts and chunk_ids from collection {self.collection_name}")
+            return texts, chunk_ids
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve texts: {str(e)}")
             raise
