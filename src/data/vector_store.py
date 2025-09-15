@@ -240,7 +240,6 @@ class VectorStore:
                 self.logger.error("No valid texts or embeddings to insert")
                 return False
 
-            # Store data in Milvus with force_recreate=True
             success = self.store_vectors(
                 texts=texts,
                 embeddings=embeddings,
@@ -263,8 +262,8 @@ if __name__ == "__main__":
     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
     parser.add_argument("--embedding_dim", type=int, default=1024, help="Dimension of embedding vectors")
-    parser.add_argument("--chunks_dir", type=str, default="data/chunks/prefettura_v1.2_chunks", help="Directory containing chunked text files")
-    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/prefettura_v1.2_embeddings", help="Directory containing embedding files")
+    parser.add_argument("--chunks_dir", type=str, default="data/chunks/prefettura_v1.3_chunks", help="Directory containing chunked text files")
+    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/prefettura_v1.3_embeddings", help="Directory containing embedding files")
     parser.add_argument("--texts_dir", type=str, default=None, help="Directory containing original text files (optional)")
     args = parser.parse_args()
 
