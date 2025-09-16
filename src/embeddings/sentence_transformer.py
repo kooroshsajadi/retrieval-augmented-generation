@@ -1,9 +1,10 @@
 import json
+import os
 from typing import Dict, List, Any
 from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from src.models.embeddings import EmbeddingModels
+from src.utils.models.bi_encoders import EncoderModels
 import yaml
 from src.utils.logging_utils import setup_logger
     
@@ -47,14 +48,14 @@ class EmbeddingGenerator:
         """
 
         if not self.chunking_info_path.exists():
-            self.logger.error("Chunking summary file not found: %s", self.chunking_info_path)
-            raise FileNotFoundError(f"Chunking summary file not found: {self.chunking_info_path}")
+            self.logger.error("Chunking metadata file not found: %s", self.chunking_info_path)
+            raise FileNotFoundError(f"Chunking metadata file not found: {self.chunking_info_path}")
 
         try:
             with open(self.chunking_info_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            self.logger.error("Failed to load chunking summary: %s", str(e))
+            self.logger.error("Failed to load chunking metadata: %s", str(e))
             raise
 
     def generate_embedding(self, text: str) -> np.ndarray:
@@ -169,7 +170,7 @@ class EmbeddingGenerator:
         self.logger.info("Processed %d/%d files", processed_files, len(metadata))
 
         # Save all metadata in a single summary file
-        summary_file = self.output_dir / "embeddings_summary.json"
+        summary_file = "data/metadata/embeddings_prefettura_v1.3.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=2)
@@ -184,8 +185,8 @@ class EmbeddingGenerator:
         Returns:
             List[Dict[str, Any]]: List of embedding result dictionaries.
         """
-        summary_file = self.output_dir / "embeddings_summary.json"
-        if not summary_file.exists():
+        summary_file = "data/metadata/embeddings_prefettura_v1.3.json"
+        if not os.path.exists(summary_file):
             self.logger.warning("Embeddings summary file not found: %s", summary_file)
             return []
 
@@ -204,7 +205,7 @@ if __name__ == "__main__":
             input_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
             output_dir=config['embeddings'].get('prefettura_v1.3', 'data/embeddings/prefettura_v1.3_embeddings'),
             chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3', 'data/metadata/chunking_prefettura_v1.3_chunks.json'),
-            model_name=EmbeddingModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value
+            model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value
         )
         generator.process_directory()
         print("Embedding generation completed.")
