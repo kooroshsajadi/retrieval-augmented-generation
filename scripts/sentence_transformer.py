@@ -60,7 +60,7 @@ class SentenceTransformerEmbedder:
         """
         try:
             embedding = self.model.encode(text, normalize_embeddings=True)
-            self.logger.debug("Generated embedding for text (length: %d)", len(text))
+            self.logger.info("Generated embedding for query (length: %d)", len(text))
             return embedding
         except Exception as e:
             self.logger.error("Embedding generation failed: %s", str(e))
@@ -100,7 +100,7 @@ class SentenceTransformerEmbedder:
             self.logger.error("Query embedding failed: %s", str(e))
             return result
 
-    def process_file(self, file_path: str, extracted_text: str = None) -> Dict[str, Any]:
+    def process_file(self, file_path: str, extracted_text: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate embeddings for text extracted from a file.
 
@@ -111,10 +111,10 @@ class SentenceTransformerEmbedder:
         Returns:
             Dict[str, Any]: Result with chunks, embeddings, and metadata.
         """
-        file_path = Path(file_path)
+        sample_path = Path(file_path)
         result = {
-            "file_path": file_path.as_posix(),
-            "file_name": file_path.name,
+            "file_path": sample_path.as_posix(),
+            "file_name": sample_path.name,
             "is_valid": False,
             "error": None,
             "chunk_embeddings": []
@@ -124,7 +124,7 @@ class SentenceTransformerEmbedder:
         try:
             # Read extracted text if not provided
             if extracted_text is None:
-                text_file = Path("data/texts") / f"{file_path.stem}.txt"
+                text_file = Path("data/texts") / f"{sample_path.stem}.txt"
                 if not text_file.exists():
                     result["error"] = f"Extracted text file not found: {text_file}"
                     self.logger.error(result["error"])
@@ -141,7 +141,7 @@ class SentenceTransformerEmbedder:
 
             # Generate embeddings for each chunk
             for i, chunk in enumerate(chunks):
-                chunk_id = f"{file_path.stem}_chunk_{i}"
+                chunk_id = f"{sample_path.stem}_chunk_{i}"
                 embedding = self.generate_embedding(chunk["text"])
                 if embedding.size == 0:
                     self.logger.warning("Empty embedding for chunk %s", chunk_id)

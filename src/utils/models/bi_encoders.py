@@ -1,11 +1,15 @@
 from enum import Enum
 
-class BiEncoderModels(Enum):
+class EncoderModels(Enum):
     # Embedding size: 1024, suitable for high-performance machines (GPU with 8GB+ VRAM)
     MULTILINGUAL_E5_LARGE = "intfloat/multilingual-e5-large"
     
     # Embedding size: 1024, suitable for high-performance machines (GPU with 8GB+ VRAM)
     MULTILINGUAL_E5_LARGE_INSTRUCT = "intfloat/multilingual-e5-large-instruct"
+
+    # Ideal for generating embeddings for legal text.
+    # Embedding size: 768, suitable for high-performance machines (CPU or GPU with 4GB+ VRAM).
+    ITALIAN_LEGAL_BERT_SC = "dlicari/Italian-Legal-BERT-SC"
     
     # Embedding size: 768 (after pooling), suitable for medium to high-performance machines (CPU or GPU with 4GB+ VRAM)
     BERT_BASE_ITALIAN_CASED = "dbmdz/bert-base-italian-cased"

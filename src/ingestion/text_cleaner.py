@@ -34,8 +34,8 @@ class TextCleaner:
         # Patterns for cleaning
         self.header_footer_patterns = [
             r"Page\s+\d+\s*(of\s+\d+)?",  # e.g., "Page 1", "Page 1 of 5"
-            r"\d{1,2}/\d{1,2}/\d{2,4}",  # e.g., "12/31/2023"
-            r"\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?",  # e.g., "12:30", "12:30:45 PM"
+            # r"\d{1,2}/\d{1,2}/\d{2,4}",  # e.g., "12/31/2023"
+            # r"\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?",  # e.g., "12:30", "12:30:45 PM"
         ]
         self.special_char_pattern = r"[^\w\sàèìòùÀÈÌÒÙ.,:-;'\"“”‘’()]"
 

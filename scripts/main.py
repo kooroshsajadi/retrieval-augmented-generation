@@ -12,9 +12,10 @@ from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
 from src.augmentation.augmenter import Augmenter
-from src.models.cross_encoders import CrossEncoderModels
-from src.models.bi_encoders import BiEncoderModels
-from src.models.llms import LargeLanguageModels
+from src.utils.models.cross_encoders import CrossEncoderModels
+from src.utils.models.bi_encoders import EncoderModels
+from src.utils.models.llms import LargeLanguageModels
+from src.utils.models.model_types import ModelTypes
 
 class RAGOrchestrator:
     """Orchestrates the RAG pipeline for processing user queries and files."""
@@ -43,41 +44,41 @@ class RAGOrchestrator:
             logger=self.logger
         )
         self.embedder = SentenceTransformerEmbedder(
-            model_name=self.config.get("embedding_modell", BiEncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value),
+            model_name=self.config.get("embedding_modell", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             output_dir=self.config["data"]["embeddings"],
-            max_chunk_words=self.config.get("max_chunk_words", 500),
-            min_chunk_length=self.config.get("min_chunk_length", 10),
+            max_chunk_words=self.config.get("max_chunk_wordss", 500),
+            min_chunk_length=self.config.get("min_chunk_lengthh", 10),
             logger=self.logger
         )
         self.vector_store = VectorStore(
-            collection_name=self.config.get("collection_name", "gotmat_collection"),
-            milvus_host=self.config.get("milvus_host", "localhost"),
-            milvus_port=self.config.get("milvus_port", "19530"),
-            embedding_dim=self.config.get("embedding_dim", 1024),
-            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3_chunks"),
-            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3_embeddings"),
+            collection_name=self.config.get("collection_namee", "gotmat_collection"),
+            milvus_host=self.config.get("milvus_hostt", "localhost"),
+            milvus_port=self.config.get("milvus_portt", "19530"),
+            embedding_dim=self.config.get("embedding_dimm", 1024),
+            chunks_dir=self.config["data"].get("chunkss", "data/chunks/prefettura_v1.3_chunks"),
+            embeddings_dir=self.config["data"].get("embeddingss", "data/embeddings/prefettura_v1.3_embeddings"),
             logger=self.logger
         )
         self.retriever = MilvusRetriever(
-            collection_name=self.config.get("collection_name", "gotmat_collection"),
-            embedding_model=self.config.get("embedding_modell", BiEncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value),
-            milvus_host=self.config.get("milvus_host", "localhost"),
-            milvus_port=self.config.get("milvus_port", "19530"),
+            collection_name=self.config.get("collection_namee", "gotmat_collection"),
+            embedding_model=self.config.get("embedding_modell", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
+            milvus_host=self.config.get("milvus_hostt", "localhost"),
+            milvus_port=self.config.get("milvus_portt", "19530"),
             reranker_model=CrossEncoderModels.MS_MARCO_MINILM_L12_V2.value,
             logger=self.logger
         )
         self.augmenter = Augmenter(
-            max_contexts=self.config.get("max_contexts", 5),
-            max_context_length=self.config.get("max_context_lengthh", 1500),
+            max_contexts=self.config.get("max_augmentation_contextss", 5),
+            max_context_length=self.config.get("max_context_lengthh", 2000),
             logger=self.logger
         )
         self.generator = LLMGenerator(
-            model_path=LargeLanguageModels.ITALIAN_LEGAL_BERT_SC.value, #self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
-            #adapter_path=self.config.get("adapter_path", "models/fine_tuned_models/opus-mt-it-en-v1/model"),
-            #tokenizer_path=self.config.get("tokenizer_path", "models/fine_tuned_models/opus-mt-it-en-v1/tokenizer"),
-            model_type="seq2seq",
-            max_length=self.config.get("max_length", 128),
-            device=self.config.get("device", "auto"),
+            model_path=self.config.get("model_pathh", LargeLanguageModels.MBART_LARGE_50.value),
+            adapter_path=self.config.get("adapter_pathh", None),
+            tokenizer_path=self.config.get("tokenizer_pathh", None),
+            model_type=ModelTypes.SEQ2SEQ.value,
+            max_length=self.config.get("max_input_tokenization_lengthh", 512),
+            device=self.config.get("devicee", "auto"),
             logger=self.logger
         )
 

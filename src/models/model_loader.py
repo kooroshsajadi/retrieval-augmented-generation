@@ -1,20 +1,15 @@
-from pathlib import Path
 from typing import Optional, Union
 import torch
 import logging
 from transformers import AutoModelForSeq2SeqLM, AutoModel, AutoTokenizer, AutoConfig
 from src.utils.logging_utils import setup_logger
 from peft import PeftModel
+from src.utils.models.model_types import MODEL_TYPE_MAPPING
 
 logger = setup_logger(__name__)
 
 class ModelLoader:
     """Model loader for inference in RAG pipeline, supporting seq2seq and encoder-only models."""
-
-    MODEL_TYPE_MAPPING = {
-        "seq2seq": AutoModelForSeq2SeqLM,
-        "encoder-only": AutoModel
-    }
 
     def __init__(
         self,
@@ -41,24 +36,27 @@ class ModelLoader:
         self.model_name = model_name
         self.model_type = model_type.lower()
         self.max_length = max_length
-        self.logger = logger or setup_logger(__name__)
+        self.logger = logger or setup_logger("src.models.model_loader")
 
         # Validate model_type
-        if self.model_type not in self.MODEL_TYPE_MAPPING:
-            raise ValueError(f"Unsupported model_type: {self.model_type}. Choose from {list(self.MODEL_TYPE_MAPPING.keys())}")
+        if self.model_type not in MODEL_TYPE_MAPPING:
+            raise ValueError(f"Unsupported model_type: {self.model_type}. Choose from {list(MODEL_TYPE_MAPPING.keys())}")
 
-        # Detect model type from configuration if not specified
+        # Detect model type from configuration if not specified correctly
         try:
             config = AutoConfig.from_pretrained(model_name, trust_remote_code=False)
-            if self.model_type == "seq2seq" and not any(isinstance(config, cls) for cls in [
-                AutoModelForSeq2SeqLM._model_mapping.keys()
-            ]):
-                self.logger.warning(f"Model {model_name} has config {type(config).__name__}, which is not seq2seq. Switching to encoder-only.")
+            seq2seq_configs = tuple(AutoModelForSeq2SeqLM._model_mapping.keys())
+            encoder_configs = tuple(AutoModel._model_mapping.keys())
+
+            if self.model_type == "seq2seq" and not isinstance(config, seq2seq_configs):
+                self.logger.warning(
+                    f"Model {model_name} has config {type(config).__name__}, which is not seq2seq. Switching to encoder-only."
+                )
                 self.model_type = "encoder-only"
-            elif self.model_type == "encoder-only" and not any(isinstance(config, cls) for cls in [
-                AutoModel._model_mapping.keys()
-            ]):
-                self.logger.warning(f"Model {model_name} has config {type(config).__name__}, which is not encoder-only. Switching to seq2seq.")
+            elif self.model_type == "encoder-only" and not isinstance(config, encoder_configs):
+                self.logger.warning(
+                    f"Model {model_name} has config {type(config).__name__}, which is not encoder-only. Switching to seq2seq."
+                )
                 self.model_type = "seq2seq"
         except Exception as e:
             self.logger.error(f"Failed to load config for {model_name}: {str(e)}")
@@ -76,7 +74,7 @@ class ModelLoader:
 
         # Load base model
         try:
-            model_class = self.MODEL_TYPE_MAPPING[self.model_type]
+            model_class = MODEL_TYPE_MAPPING[self.model_type]
             base_model = model_class.from_pretrained(
                 model_name,
                 device_map=device_map,

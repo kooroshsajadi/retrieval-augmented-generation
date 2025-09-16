@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from src.models.model_loader import ModelLoader
 from src.utils.logging_utils import setup_logger
 import torch
 
@@ -29,17 +30,18 @@ class LLMGenerator:
             device (str): Device to run model on ('auto', 'cpu', 'cuda').
             logger (Optional[logging.Logger]): Logger instance.
         """
-        self.logger = logger or setup_logger("llm_generator")
+        self.logger = logger or setup_logger("src.generation.llm_generator")
         self.max_length = max_length
-        self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else ("xpu" if torch.xpu.is_available() else "cpu"))
         self.model_type = model_type
 
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path or model_path)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
-            if adapter_path:
-                self.model.load_adapter(adapter_path)
-            self.model.to(self.device)
+            # self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path or model_path)
+            # self.model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+            self.model = ModelLoader(model_name=model_path, model_type=model_type, adapter_path=adapter_path, tokenizer_path=tokenizer_path, device_map=self.device)
+            # if adapter_path:
+            #     self.model.load_adapter(adapter_path)
+            # self.model.to(self.device)
             self.logger.info("Loaded model %s on %s", model_path, self.device)
         except Exception as e:
             self.logger.error("Failed to load model or tokenizer: %s", str(e))
@@ -57,8 +59,9 @@ class LLMGenerator:
             str: Generated response.
         """
         try:
-            inputs = self.tokenizer(prompt, return_tensors="pt", max_length=self.max_length, truncation=True).to(self.device)
-            outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+            # inputs = self.tokenizer(prompt, return_tensors="pt", max_length=self.max_length, truncation=True).to(self.device)
+            # outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+            outputs = self.model.generate(prompt, max_new_tokens=max_new_tokens)
             response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
             self.logger.info("Generated response for prompt: %s...", prompt[:50])
             return response

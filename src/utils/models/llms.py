@@ -11,16 +11,6 @@ class LargeLanguageModels(Enum):
     # Suitable for medium-performance machines (CPU or GPU with 4GB+ VRAM).
     OPUS_MT_IT_EN = "Helsinki-NLP/opus-mt-it-en"
     
-    # Italian-Legal-BERT: ~110M parameters, encoder-only transformer fine-tuned on Italian legal texts.
-    # Suitable for text classification, named entity recognition, or generating embeddings for legal documents.
-    # Compatible with medium to high-performance machines (CPU or GPU with 4GB+ VRAM).
-    ITALIAN_LEGAL_BERT = "dlicari/Italian-Legal-BERT"
-    
-    # Italian-Legal-BERT-SC: ~110M parameters, encoder-only transformer fine-tuned for semantic classification on Italian legal texts.
-    # Ideal for understanding legal context or generating embeddings for legal chunks in the RAG pipeline.
-    # Compatible with medium to high-performance machines (CPU or GPU with 4GB+ VRAM).
-    ITALIAN_LEGAL_BERT_SC = "dlicari/Italian-Legal-BERT-SC"
-    
     # Distil-Italian-Legal-BERT: ~67M parameters, encoder-only transformer (distilled BERT) fine-tuned on Italian legal texts.
     # Lightweight model for embedding generation or classification tasks with lower resource demands.
     # Suitable for low to medium-performance machines (CPU or GPU with 2GB+ VRAM).

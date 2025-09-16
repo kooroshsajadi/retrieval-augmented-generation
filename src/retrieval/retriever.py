@@ -4,8 +4,8 @@ from src.retrieval.milvus_connector import MilvusConnector
 from src.retrieval.query_encoder import QueryEncoder
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.retrieval.reranker import Reranker
-from src.models.cross_encoders import CrossEncoderModels
-from src.models.bi_encoders import BiEncoderModels
+from src.utils.models.cross_encoders import CrossEncoderModels
+from src.utils.models.bi_encoders import EncoderModels
 from src.utils.logging_utils import setup_logger
 
 class MilvusRetriever:
@@ -13,7 +13,7 @@ class MilvusRetriever:
     def __init__(
         self,
         collection_name: str = "legal_texts",
-        embedding_model: str = BiEncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value,
+        embedding_model: str = EncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value,
         milvus_host: str = "localhost",
         milvus_port: str = "19530",
         reranker_model: str = CrossEncoderModels.MS_MARCO_MINILM_L12_V2.value,

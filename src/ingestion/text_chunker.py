@@ -158,7 +158,6 @@ class TextChunker:
                 result["error"] = "No valid chunks created (too short or lacks meaningful content)"
                 self.logger.warning(result["error"])
 
-            # Save each chunk (no per-file metadata any longer)
             self.save_chunks(file_path.name, chunks)
             return result
 

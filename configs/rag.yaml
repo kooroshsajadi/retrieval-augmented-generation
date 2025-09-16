@@ -21,11 +21,11 @@ milvus_port: 19530
 model_path: facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
 adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
 tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
-max_length: 512
+max_input_tokenization_length: 512
 max_new_tokens: 200
 device: auto
 max_chunk_words: 500
 min_chunk_length: 10
-max_contexts: 5
+max_augmentation_contexts: 5
 max_context_length: 1000
 tessdata_dir: C:/Program Files/Tesseract-OCR/tessdata
