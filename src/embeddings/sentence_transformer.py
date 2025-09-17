@@ -30,7 +30,7 @@ class EmbeddingGenerator:
         self.output_dir = Path(output_dir)
         self.chunking_info_path = Path(chunking_info_path)
         self.model_name = model_name
-        self.logger = setup_logger("sentence_transformer")
+        self.logger = setup_logger("src.embeddings.sentence_transformer")
 
         # Initialize model
         self.model = SentenceTransformer(model_name)
@@ -202,9 +202,9 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
-            output_dir=config['embeddings'].get('prefettura_v1.3', 'data/embeddings/prefettura_v1.3_embeddings'),
-            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3', 'data/metadata/chunking_prefettura_v1.3_chunks.json'),
+            input_dir=config['chunks'].get('prefettura_v1.33', 'data/chunks/prefettura_v1.3_chunks'),
+            output_dir=config['embeddings'].get('prefettura_v1.33', 'data/embeddings/prefettura_v1.3_embeddings'),
+            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.33', 'data/metadata/chunking_prefettura_v1.3_chunks.json'),
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value
         )
         generator.process_directory()
