@@ -15,3 +15,8 @@ class LargeLanguageModels(Enum):
     # Lightweight model for embedding generation or classification tasks with lower resource demands.
     # Suitable for low to medium-performance machines (CPU or GPU with 2GB+ VRAM).
     DISTIL_ITA_LEGAL_BERT = "dlicari/distil-ita-legal-bert"
+    
+    # Llama 3 8B Instruct: ~8B parameters, auto-regressive transformer (decoder-only) with supervised fine-tuning and RLHF alignment.
+    # Designed for high-quality legal dialog, reasoning, and instruction following, supporting multilingual generation and code tasks.
+    # Suitable for high-performance servers (GPU with 16GB+ VRAM). Best for legal RAG generation and assistant-style response tasks.
+    LLAMA_3_8B_INSTRUCT = "meta-llama/Meta-Llama-3-8B-Instruct"

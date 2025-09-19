@@ -3,8 +3,14 @@ data:
   texts: data/texts
   cleaned_texts: data/cleaned_texts
   chunks: data/chunks/prefettura_v1.3_chunks
-  embeddings: data/embeddings/prefettura_v1.3_embeddings
+  embeddings_metadata: data/embeddings/prefettura_v1.3_embeddings
   destination: data/results
+model:
+  reranker_model: "dlicari/Italian-Legal-BERT"
+  model_path: facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
+  adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
+  tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
+  embedding_model: "dlicari/Italian-Legal-BERT-SC"
 supported_formats:
   - .text
   - .txt
@@ -13,19 +19,17 @@ supported_formats:
   - .gif
   - .png
   - .pdf
-embedding_model: intfloat/multilingual-e5-large
-embedding_dim: 1024
+embedding_dim: 768
 collection_name: gotmat_collection
 milvus_host: localhost
 milvus_port: 19530
-model_path: facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
-adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
-tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
 max_input_tokenization_length: 512
 max_new_tokens: 200
 device: auto
 max_chunk_words: 500
+max_chunk_length: 2000
 min_chunk_length: 10
 max_augmentation_contexts: 5
 max_context_length: 1000
+max_parent_length: 2000
 tessdata_dir: C:/Program Files/Tesseract-OCR/tessdata

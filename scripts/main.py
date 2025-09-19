@@ -7,10 +7,11 @@ import numpy as np
 from src.utils.logging_utils import setup_logger
 from scripts.validate_data import DataValidator
 from scripts.ingest_data import DataIngestor
-from scripts.sentence_transformer import SentenceTransformerEmbedder
+# from scripts.sentence_transformer import SentenceTransformerEmbedder
+from src.embeddings.sentence_transformer import EmbeddingGenerator
 from src.data.vector_store import VectorStore
-from src.retrieval.milvus_retriever import MilvusRetriever
-from src.generation.llm_generator import LLMGenerator
+from src.retrieval.retriever import MilvusRetriever
+from src.generation.generator import LLMGenerator
 from src.augmentation.augmenter import Augmenter
 from src.utils.models.cross_encoders import CrossEncoderModels
 from src.utils.models.bi_encoders import EncoderModels
@@ -48,10 +49,17 @@ class RAGOrchestrator:
             tessdata_dir=self.config.get("tessdata_dir", None),
             logger=self.logger
         )
-        self.embedder = SentenceTransformerEmbedder(
-            model_name=self.config.get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
+        # self.embedder = SentenceTransformerEmbedder(
+        #     model_name=self.config.get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
+        #     output_dir=self.config["data"]["embeddings"],
+        #     max_chunk_words=self.config.get("max_chunk_words", 500),
+        #     min_chunk_length=self.config.get("min_chunk_length", 10),
+        #     logger=self.logger
+        # )
+        self.embedder = EmbeddingGenerator(
+            model_name=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             output_dir=self.config["data"]["embeddings"],
-            max_chunk_words=self.config.get("max_chunk_words", 500),
+            max_chunk_length=self.config.get("max_chunk_length", 2000),
             min_chunk_length=self.config.get("min_chunk_length", 10),
             logger=self.logger
         )
@@ -62,15 +70,15 @@ class RAGOrchestrator:
             embedding_dim=self.config.get("embedding_dim", 768),
             chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3_chunks"),
             embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3_embeddings"),
-            metadata_path=self.config["data"].get("metadata", "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json"),
+            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json"),
             logger=self.logger
         )
         self.retriever = MilvusRetriever(
             collection_name=self.config.get("collection_name", "gotmat_collection"),
-            embedding_model=self.config.get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
+            embedding_model=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
-            reranker_model=self.config.get("reranker_model", "dlicari/Italian-Legal-BERT"),
+            reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value),
             logger=self.logger
         )
         self.augmenter = Augmenter(
@@ -80,10 +88,10 @@ class RAGOrchestrator:
             logger=self.logger
         )
         self.generator = LLMGenerator(
-            model_path=self.config.get("model_path", LargeLanguageModels.LLAMA_3_8B_INSTRUCT.value),
-            adapter_path=self.config.get("adapter_path", None),
-            tokenizer_path=self.config.get("tokenizer_path", None),
-            model_type=ModelTypes.CAUSAL.value,
+            model_path=self.config['model'].get("model_path", LargeLanguageModels.MBART_LARGE_50.value),
+            # adapter_path=self.config.get("adapter_path", None),
+            # tokenizer_path=self.config.get("tokenizer_path", None),
+            model_type=ModelTypes.SEQ2SEQ.value,
             max_length=self.config.get("max_input_tokenization_length", 2048),
             device=self.config.get("device", "auto"),
             logger=self.logger

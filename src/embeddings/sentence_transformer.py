@@ -1,9 +1,11 @@
 import json
+import logging
 import os
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from src.ingestion.text_chunker import TextChunker
 from src.utils.models.bi_encoders import EncoderModels
 import yaml
 from src.utils.logging_utils import setup_logger
@@ -16,8 +18,11 @@ class EmbeddingGenerator:
         self,
         input_dir: str = "data/chunked_text",
         output_dir: str = "data/embeddings",
-        chunking_info_path: str = "data/metadata/chunking_prefettura_v1.3_chunks_parent.json",
+        max_chunk_length: int = 2000,
+        min_chunk_length: int = 10,
+        chunking_info_path: Optional[str] = None,
         model_name: str = "dlicari/Italian-Legal-BERT-SC",
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize EmbeddingGenerator with configuration parameters.
@@ -30,17 +35,29 @@ class EmbeddingGenerator:
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
-        self.chunking_info_path = Path(chunking_info_path)
+        if chunking_info_path is not None:
+            self.chunking_info_path = Path(chunking_info_path)
         self.model_name = model_name
-        self.logger = setup_logger("src.embeddings.sentence_transformer")
+        self.logger = logger or setup_logger("src.embeddings.sentence_transformer")
 
         # Initialize model
-        device = "xpu" if torch.xpu.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = SentenceTransformer(model_name_or_path=model_name, device=device)
-        self.logger.info("Loaded SentenceTransformer model: %s", model_name)
-        self.logger.info("Using device: %s", device)
+        try:
+            device = "xpu" if torch.xpu.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+            self.model = SentenceTransformer(model_name_or_path=model_name, device=device)
+            self.logger.info("Loaded SentenceTransformer model: %s", model_name)
+            self.logger.info("Using device: %s", device)
+        except Exception as e:
+            self.logger.error("Failed to initialize SentenceTransformer model: %s", str(e))
+            raise
 
-        # Ensure output directory exists
+        # Initialize TextChunker for file text
+        self.chunker = TextChunker(
+            max_chunk_length=max_chunk_length,
+            min_chunk_length=min_chunk_length,
+            logger=self.logger
+        )
+        
+        # Ensure output directory exists.
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def load_chunk_metadata(self) -> List[Dict[str, Any]]:
@@ -79,7 +96,127 @@ class EmbeddingGenerator:
             self.logger.error("Embedding generation failed: %s", str(e))
             return np.array([])
 
-    def process_file(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def process_query(self, query: str) -> Dict[str, Any]:
+        """
+        Generate embedding for a user query or command.
+
+        Args:
+            query (str): User query or command text.
+
+        Returns:
+            Dict[str, Any]: Result with query, embedding, and status.
+        """
+        result = {
+            "query": query,
+            "embedding": None,
+            "is_valid": False,
+            "error": None
+        }
+
+        self.logger.info("Processing query: %s", query[:50])
+        try:
+            embedding = self.generate_embedding(query)
+            if embedding.size == 0:
+                result["error"] = "Failed to generate embedding"
+                self.logger.error(result["error"])
+                return result
+
+            result["embedding"] = embedding
+            result["is_valid"] = True
+            self.logger.info("Successfully generated embedding for query")
+            return result
+        except Exception as e:
+            result["error"] = str(e)
+            self.logger.error("Query embedding failed: %s", str(e))
+            return result
+    
+    def process_file(self, file_path: str, extracted_text: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Generate embeddings for text extracted from a file.
+
+        Args:
+            file_path (str): Path to the original file (for metadata).
+            extracted_text (str, optional): Pre-extracted text; if None, read from data/texts/.
+
+        Returns:
+            Dict[str, Any]: Result with chunks, embeddings, and metadata.
+        """
+        sample_path = Path(file_path)
+        result = {
+            "file_path": sample_path.as_posix(),
+            "file_name": sample_path.name,
+            "is_valid": False,
+            "error": None,
+            "chunk_embeddings": []
+        }
+
+        self.logger.info("Processing file: %s", file_path)
+        try:
+            # Read extracted text if not provided
+            if extracted_text is None:
+                text_file = Path("data/texts") / f"{sample_path.stem}.txt"
+                if not text_file.exists():
+                    result["error"] = f"Extracted text file not found: {text_file}"
+                    self.logger.error(result["error"])
+                    return result
+                with open(text_file, "r", encoding="utf-8") as f:
+                    extracted_text = f.read()
+
+            # Chunk the text
+            chunks = self.chunker.chunk_text(extracted_text)
+            if not chunks:
+                result["error"] = "No valid chunks generated"
+                self.logger.error(result["error"])
+                return result
+
+            # Generate embeddings for each chunk
+            for i, chunk in enumerate(chunks):
+                chunk_id = f"{sample_path.stem}_chunk_{i}"
+                embedding = self.generate_embedding(chunk["text"])
+                if embedding.size == 0:
+                    self.logger.warning("Empty embedding for chunk %s", chunk_id)
+                    continue
+
+                # Save embedding
+                embedding_file = self.output_dir / f"{chunk_id}.npy"
+                try:
+                    np.save(embedding_file, embedding)
+                    self.logger.info("Saved embedding to %s", embedding_file)
+                except Exception as e:
+                    self.logger.error("Failed to save embedding to %s: %s", embedding_file, str(e))
+                    continue
+
+                # Store metadata
+                result["chunk_embeddings"].append({
+                    "chunk_id": chunk_id,
+                    "text": chunk["text"],
+                    "embedding_file": f"{chunk_id}.npy",
+                    "is_valid": True
+                })
+
+            result["is_valid"] = len(result["chunk_embeddings"]) > 0
+            if not result["is_valid"]:
+                result["error"] = "No valid embeddings generated"
+                self.logger.warning(result["error"])
+
+            # Save metadata
+            summary_file = self.output_dir / "embeddings_summary.json"
+            existing_results = []
+            if summary_file.exists():
+                with open(summary_file, "r", encoding="utf-8") as f:
+                    existing_results = json.load(f)
+            existing_results.append(result)
+            with open(summary_file, "w", encoding="utf-8") as f:
+                json.dump(existing_results, f, ensure_ascii=False, indent=2)
+            self.logger.info("Updated embeddings summary: %s", summary_file)
+
+            return result
+        except Exception as e:
+            result["error"] = str(e)
+            self.logger.error("File embedding failed: %s", str(e))
+            return result
+
+    def process_internal_file(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process child chunks for a single file and generate embeddings.
 
