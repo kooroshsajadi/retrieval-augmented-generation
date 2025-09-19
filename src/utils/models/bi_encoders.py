@@ -12,6 +12,11 @@ class EncoderModels(Enum):
     # Embedding size: 768, max tokens: 512, suitable for medium to high-performance machines (CPU or GPU with 4GB+ VRAM).
     # Fine-tuned on Italian legal texts, ideal for legal-specific embeddings or classification tasks.
     ITALIAN_LEGAL_BERT_SC = "dlicari/Italian-Legal-BERT-SC"
+
+    # Embedding size: 768, max tokens: 512; fine-tuned on large Italian legal corpus (civil cases, judgments, legal codes) using bert-base-italian-xxl-cased as a foundation.
+    # ITALIAN_LEGAL_BERT: Delivers superior performance over general BERT for Italian legal research tasks, including textual entailment, argument mining, and document classification.
+    # Ideal for embedding generation and supervised learning within the Italian legal domain.
+    ITALIAN_LEGAL_BERT = "dlicari/Italian-Legal-BERT"
     
     # Embedding size: 768 (after pooling), max tokens: 512, suitable for medium to high-performance machines (CPU or GPU with 4GB+ VRAM).
     # BERT-based model for Italian text, suitable for generating embeddings or classification.
