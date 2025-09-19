@@ -70,12 +70,12 @@ class MilvusConnector:
             self.logger.error(f"Search failed: {str(e)}")
             raise
 
-    def get_all_texts(self) -> Tuple[List[str], List[str]]:
+    def get_all_texts(self) -> Tuple[List[str], List[str], List[str], List[str]]:
         """
-        Retrieve all texts and their corresponding chunk IDs from the Milvus collection.
+        Retrieve all texts, chunk IDs, parent IDs, and parent file paths from the Milvus collection.
 
         Returns:
-            Tuple[List[str], List[str]]: Lists of texts and chunk_ids.
+            Tuple[List[str], List[str], List[str], List[str]]: Lists of texts, chunk_ids, parent_ids, and parent_file_paths.
 
         Raises:
             MilvusException: If the query fails after retries.
@@ -83,6 +83,8 @@ class MilvusConnector:
         try:
             texts = []
             chunk_ids = []
+            parent_ids = []
+            parent_file_paths = []
             offset = 0
             limit = 1000  # Fetch in batches to handle large collections
             retries = 3
@@ -95,15 +97,19 @@ class MilvusConnector:
                             expr="",  # Empty expression to fetch all
                             offset=offset,
                             limit=limit,
-                            output_fields=["chunk_id", "text"]
+                            output_fields=["chunk_id", "text", "parent_id", "parent_file_path"]
                         )
-                        # Extract texts and chunk_ids
+                        # Extract texts, chunk_ids, parent_ids, and parent_file_paths
                         for hit in result:
                             chunk_id = hit.get("chunk_id")
                             text = hit.get("text", "")
+                            parent_id = hit.get("parent_id", "")
+                            parent_file_path = hit.get("parent_file_path", "")
                             if text.strip():  # Skip empty texts
                                 texts.append(text)
                                 chunk_ids.append(chunk_id)
+                                parent_ids.append(parent_id)
+                                parent_file_paths.append(parent_file_path)
                             else:
                                 self.logger.warning(f"Skipping empty text for chunk_id: {chunk_id}")
 
@@ -124,8 +130,8 @@ class MilvusConnector:
                 if len(result) < limit:
                     break
 
-            self.logger.info(f"Retrieved {len(texts)} texts and chunk_ids from collection {self.collection_name}")
-            return texts, chunk_ids
+            self.logger.info(f"Retrieved {len(texts)} texts, chunk_ids, parent_ids, and parent_file_paths from collection {self.collection_name}")
+            return texts, chunk_ids, parent_ids, parent_file_paths
         except Exception as e:
             self.logger.error(f"Failed to retrieve texts: {str(e)}")
             raise

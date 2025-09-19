@@ -5,6 +5,7 @@ data:
   chunks: data/chunks/prefettura_v1.3_chunks
   embeddings_metadata: data/embeddings/prefettura_v1.3_embeddings
   destination: data/results
+  embeddings: data/embeddings/main
 model:
   reranker_model: "dlicari/Italian-Legal-BERT"
   model_path: facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en

@@ -54,6 +54,7 @@ class EmbeddingGenerator:
         self.chunker = TextChunker(
             max_chunk_length=max_chunk_length,
             min_chunk_length=min_chunk_length,
+            embedder=self.model,
             logger=self.logger
         )
         
