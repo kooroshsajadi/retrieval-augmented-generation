@@ -1,14 +1,15 @@
+import hashlib
 import json
 import re
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 import yaml
 import logging
-from transformers import AutoTokenizer
+from sentence_transformers import SentenceTransformer
 from src.utils.logging_utils import setup_logger
 from src.utils.ingestion.chunk_strategy import ChunkingStrategy
 from src.utils.ingestion.sentence_based_chunking import create_sentence_based_chunks
-from src.utils.ingestion.parent_chunking import create_parent_chunks
+from src.utils.ingestion.parent_chunking import ParentChildChunking
 from src.utils.models.bi_encoders import EncoderModels
 
 class TextChunker:
@@ -18,11 +19,11 @@ class TextChunker:
         self,
         input_dir: str = "data/cleaned_text",
         output_dir: str = "data/chunked_text",
-        max_chunk_words: int = 500,
+        max_chunk_length: int = 2000,
         min_chunk_length: int = 10,
-        max_tokens: int = 512,
+        max_tokens: int = 768,
         chunking_strategy: str = ChunkingStrategy.SENTENCE_BASED.value,
-        tokenizer_name: str = "intfloat/multilingual-e5-large-instruct",
+        embedder: Optional[SentenceTransformer] = None,
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -31,19 +32,20 @@ class TextChunker:
         Args:
             input_dir (str): Directory containing cleaned text files.
             output_dir (str): Directory to save chunked text and metadata.
-            max_chunk_words (int): Maximum words per chunk (for sentence-based) or child chunk (for parent).
+            max_chunk_length (int): Maximum characters per chunk (for parent) or words (for sentence-based).
             min_chunk_length (int): Minimum character count for valid chunks.
             max_tokens (int): Maximum tokens per chunk to respect embedding model limits.
             chunking_strategy (str): Chunking strategy ("sentence-based" or "parent").
-            tokenizer_name (str): Name of tokenizer for token counting.
+            embedder (SentenceTransformer): Embedding model for token counting.
             logger (logging.Logger, optional): Logger instance.
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
-        self.max_chunk_words = max_chunk_words
+        self.max_chunk_length = max_chunk_length
         self.min_chunk_length = min_chunk_length
         self.max_tokens = max_tokens
         self.chunking_strategy = chunking_strategy
+        self.embedder = embedder
         self.logger = logger or setup_logger("src.ingestion.text_chunker")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -51,13 +53,9 @@ class TextChunker:
         if self.chunking_strategy not in [s.value for s in ChunkingStrategy]:
             raise ValueError(f"Unsupported chunking_strategy: {self.chunking_strategy}. Choose from {[s.value for s in ChunkingStrategy]}")
 
-        # Load tokenizer for token counting
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=False)
-            self.logger.info(f"Loaded tokenizer: {tokenizer_name}")
-        except Exception as e:
-            self.logger.error(f"Failed to load tokenizer {tokenizer_name}: {str(e)}")
-            raise
+        # Validate embedder
+        if self.embedder is None:
+            raise ValueError("Embedder is required for token counting")
 
         # Sentence boundary regex for Italian
         self.sentence_pattern = r'(?<=[.!?])\s+(?=[A-ZÀÈÌÒÙ])'
@@ -83,7 +81,7 @@ class TextChunker:
 
     def count_tokens(self, text: str) -> int:
         """
-        Count tokens in text using the tokenizer.
+        Count tokens in text using the embedder's tokenizer.
 
         Args:
             text (str): Input text.
@@ -92,10 +90,10 @@ class TextChunker:
             int: Number of tokens.
         """
         try:
-            tokens = self.tokenizer(text, return_tensors="pt", truncation=False).input_ids
+            tokens = self.embedder.tokenizer(text, return_tensors="pt", truncation=False).input_ids
             return tokens.shape[1]
         except Exception as e:
-            self.logger.error(f"Token counting failed: {str(e)}")
+            self.logger.error(f"Token counting failed: %s", str(e))
             return 0
 
     def is_valid_chunk(self, text: str) -> bool:
@@ -125,7 +123,7 @@ class TextChunker:
             file_path (Path): Path to the input text file.
 
         Returns:
-            Dict[str, Any]: Chunking result with chunks and metadata.
+            Dict[str, Any]: Chunking result with chunks and metad
         """
         result = {
             "file_path": str(file_path),
@@ -141,24 +139,28 @@ class TextChunker:
             with open(file_path, "r", encoding="utf-8") as f:
                 text = f.read()
             result["original_length"] = len(text)
-            sentences = self.split_into_sentences(text)
 
-            # Choose chunking strategy
             if self.chunking_strategy == ChunkingStrategy.SENTENCE_BASED.value:
+                sentences = self.split_into_sentences(text)
                 chunks = create_sentence_based_chunks(
                     sentences=sentences,
-                    max_chunk_words=self.max_chunk_words,
+                    max_chunk_words=self.max_chunk_length,
                     max_tokens=self.max_tokens,
                     count_tokens=self.count_tokens,
                     is_valid_chunk=self.is_valid_chunk
                 )
             else:  # parent
-                chunks = create_parent_chunks(
-                    text=text,
-                    sentences=sentences,
+                file_stem = file_path.name.rsplit(".", 1)[0]
+                parent_chunker = ParentChildChunking(
+                    text_dir=str(self.input_dir),
                     max_tokens=self.max_tokens,
+                    max_chunk_length=self.max_chunk_length
+                )
+                chunks = parent_chunker.chunk(
+                    file_path=str(file_path),
                     count_tokens=self.count_tokens,
-                    is_valid_chunk=self.is_valid_chunk
+                    is_valid_chunk=self.is_valid_chunk,
+                    file_stem=file_stem
                 )
 
             result["chunks"] = chunks
@@ -182,17 +184,18 @@ class TextChunker:
             file_name (str): Name of original file.
             chunks (List[Dict[str, Any]]): Chunk dictionary list.
         """
-        file_stem = file_name.rsplit(".", 1)[0]
+        # file_stem = file_name.rsplit(".", 1)[0]
         for i, chunk in enumerate(chunks, 1):
-            chunk_type = chunk.get("chunk_type", "child")
-            chunk_id = f"{file_stem}_chunk_{i:03d}" if chunk_type == "child" else f"{file_stem}_parent_{i:03d}"
-            chunk_file = self.output_dir / f"{chunk_id}.txt"
+            # chunk_type = chunk.get("chunk_type")
+            # file_name = f"{file_stem}_chunk_{i:03d}" if chunk_type == "child" else f"{file_stem}_parent_{i:03d}"
+            chunk_file_name = chunk["file_name"]
+            chunk_file_path = self.output_dir / f"{chunk_file_name}.txt"
             try:
-                with open(chunk_file, "w", encoding="utf-8") as f:
+                with open(chunk_file_path, "w", encoding="utf-8") as f:
                     f.write(chunk["text"])
-                self.logger.info("Saved chunk to %s", chunk_file)
+                self.logger.info("Saved chunk to %s", chunk_file_path)
             except Exception as e:
-                self.logger.error("Failed to save chunk to %s: %s", chunk_file, str(e))
+                self.logger.error("Failed to save chunk to %s: %s", chunk_file_path, str(e))
 
     def process_directory(self) -> None:
         """
@@ -207,29 +210,52 @@ class TextChunker:
         metadata_collection = []
         for file_path in text_files:
             result = self.process_file(file_path)
+            file_stem = file_path.name.rsplit(".", 1)[0]
+            chunks_metadata = []
+            parent_chunk_ids = {}  # Map hashed parent_id to parent chunk_id
+            chunk_counter = 1
+
+            for chunk in result["chunks"]:
+                chunk_type = chunk.get("chunk_type")
+                # chunk_id = f"{file_stem}_chunk_{chunk_counter:03d}" if chunk_type == "child" else f"{file_stem}_parent_{chunk_counter:03d}"
+                chunk_id = chunk["parent_id"]
+                if chunk_type == "parent":
+                    parent_chunk_ids[chunk["parent_id"]] = chunk_id
+                chunk_path = Path(self.output_dir) / f"{chunk['file_name']}.txt"
+                chunks_metadata.append({
+                    "file_name": chunk["file_name"],
+                    "file_path": str(chunk_path),
+                    "chunk_id": chunk["chunk_id"],
+                    "chunk_type": chunk.get("chunk_type"),
+                    "word_count": chunk["word_count"],
+                    "char_length": chunk["char_length"],
+                    "token_count": chunk["token_count"],
+                    "is_valid": chunk["is_valid"],
+                    "parent_id": chunk["parent_id"],
+                    "parent_file_name": chunk.get("parent_file_name"),
+                    "parent_file_path": str(file_path) if chunk_type == "parent" else str(self.output_dir / f"{chunk['parent_file_name']}.txt")
+                })
+                chunk_counter += 1
+
+            # Update parent_id for child chunks to match parent chunk_id
+            # for meta in chunks_metadata:
+            #     if meta["chunk_type"] == "child" and meta["parent_id"] in parent_chunk_ids:
+            #         meta["parent_id"] = parent_chunk_ids[meta["parent_id"]]
+
             file_metadata = {
-                "file_path": result["file_path"],
                 "file_name": result["file_name"],
+                "file_path": result["file_path"],
+                "file_id": hashlib.md5(file_stem.encode()).hexdigest(),
+                "original_length": result["original_length"],
                 "is_valid": result["is_valid"],
                 "error": result["error"],
-                "original_length": result["original_length"],
                 "chunk_count": result["chunk_count"],
                 "chunking_strategy": self.chunking_strategy,
-                "chunks_metadata": [
-                    {
-                        "chunk_id": f"{result['file_name'].rsplit('.', 1)[0]}_chunk_{i:03d}" if chunk.get("chunk_type", "child") == "child" else f"{result['file_name'].rsplit('.', 1)[0]}_parent_{i:03d}",
-                        "word_count": chunk["word_count"],
-                        "char_length": chunk["char_length"],
-                        "token_count": chunk["token_count"],
-                        "is_valid": chunk["is_valid"],
-                        "parent_id": chunk["parent_id"],
-                        "chunk_type": chunk.get("chunk_type", "child")
-                    }
-                    for i, chunk in enumerate(result["chunks"], 1)
-                ]
+                "chunks_metadata": chunks_metadata
             }
             metadata_collection.append(file_metadata)
             processed_files += 1
+
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
         summary_file = f"data/metadata/chunking_prefettura_v1.3_chunks_{self.chunking_strategy}.json"
         try:
@@ -243,14 +269,15 @@ if __name__ == "__main__":
     with open('src/configs/config.yaml') as file:
         config = yaml.safe_load(file)
     try:
+        embedder = SentenceTransformer(EncoderModels.ITALIAN_LEGAL_BERT_SC.value)
         chunker = TextChunker(
             input_dir=config['cleaned_texts'].get('prefettura_v1.3', 'data/prefettura_v1.3_cleaned_texts'),
             output_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
-            max_chunk_words=400,
+            max_chunk_length=2000,
             min_chunk_length=10,
-            max_tokens=512,
+            max_tokens=768,
             chunking_strategy=config.get('chunking_strategy', ChunkingStrategy.PARENT.value),
-            tokenizer_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value
+            embedder=embedder
         )
         chunker.process_directory()
         print("Text chunking completed.")
