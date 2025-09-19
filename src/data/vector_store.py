@@ -6,7 +6,7 @@ import json
 import argparse
 from pymilvus import (
     connections, has_collection,
-    FieldSchema, CollectionSchema, DataType, Collection
+    FieldSchema, CollectionSchema, DataType, Collection, utility
 )
 from src.utils.logging_utils import setup_logger
 
@@ -22,6 +22,7 @@ class VectorStore:
         chunks_dir: str = "data/chunks/prefettura_v1.3_chunks",
         embeddings_dir: str = "data/embeddings/prefettura_v1.3_embeddings",
         metadata_path: str = "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json",
+        metadata: Optional[List[dict]] = None,
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -44,6 +45,7 @@ class VectorStore:
         self.chunks_dir = Path(chunks_dir)
         self.embeddings_dir = Path(embeddings_dir)
         self.metadata_path = Path(metadata_path)
+        self.metadata = []
         self.logger = logger or setup_logger("src.data.vector_store")
         
         # Validate directories
@@ -61,7 +63,7 @@ class VectorStore:
             raise
 
         # Initialize collection
-        # self.collection = self._create_collection(force_recreate=False)
+        self.collection = self._create_collection(force_recreate=False)
 
     def _load_chunk_text(self, file_path: str) -> str:
         """
@@ -104,7 +106,7 @@ class VectorStore:
 
     def _create_collection(self, force_recreate: bool = False) -> Collection:
         """
-        Create or use existing Milvus collection with the defined schema.
+        Create or use existing Milvus collection with the defined schema and ensure index exists.
 
         Args:
             force_recreate (bool): If True, drop and recreate the collection; if False, use existing or create.
@@ -119,7 +121,7 @@ class VectorStore:
             FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
             FieldSchema(name="subject", dtype=DataType.VARCHAR, max_length=100),
             FieldSchema(name="parent_id", dtype=DataType.VARCHAR, max_length=100),
-            FieldSchema(name="parent_file_path", dtype=DataType.VARCHAR, max_length=500)  # Added for parent chunk access
+            FieldSchema(name="parent_file_path", dtype=DataType.VARCHAR, max_length=500)
         ]
         schema = CollectionSchema(fields=fields, description="Collection of embeddings with metadata")
 
@@ -134,85 +136,105 @@ class VectorStore:
             collection = Collection(name=self.collection_name)
             self.logger.info("Using existing collection: %s", self.collection_name)
 
+        # Ensure index exists on the embedding field
+        index_params = {
+            "metric_type": "L2",
+            "index_type": "IVF_FLAT",
+            "params": {"nlist": 1024}
+        }
+        indexes = collection.indexes
+        if not any(index.field_name == "embedding" for index in indexes):
+            collection.create_index(field_name="embedding", index_params=index_params)
+            self.logger.info("Created index on embedding field for collection: %s", self.collection_name)
+        else:
+            self.logger.info("Index on embedding field already exists for collection: %s", self.collection_name)
+
         return collection
 
-    def store_vectors(self, texts: List[str],
-                      embeddings: List[np.ndarray],
-                      chunk_ids: List[str],
-                      subject: str = "courthouse",
-                      parent_ids: Optional[List[str]] = None,
-                      parent_file_paths: Optional[List[str]] = None,
-                      force_recreate: bool = False) -> bool:
+    def store_vectors(
+        self,
+        texts: List[str],
+        embeddings: List[np.ndarray],
+        chunk_ids: List[str],
+        parent_ids: List[str],
+        parent_file_paths: List[str],
+        subject: str = "courthouse"
+    ) -> bool:
         """
-        Store embeddings and associated metadata in Milvus.
+        Store vectors and metadata in Milvus with batch processing.
 
         Args:
             texts (List[str]): List of chunk texts.
             embeddings (List[np.ndarray]): List of embedding vectors.
             chunk_ids (List[str]): List of chunk IDs.
-            subject (str): Subject metadata for all chunks (default: 'courthouse').
-            parent_ids (List[str]): List of parent IDs for parent chunking.
-            parent_file_paths (List[str]): List of parent file paths for parent chunk access.
-            force_recreate (bool): If True, recreate the collection before insertion.
+            parent_ids (List[str]): List of parent IDs.
+            parent_file_paths (List[str]): List of parent file paths.
+            subject (str): Subject of the chunks (e.g., 'courthouse').
 
         Returns:
-            bool: True if insertion and indexing succeed, False otherwise.
+            bool: True if storage is successful, False otherwise.
         """
         try:
-            if force_recreate:
-                self.collection = self._create_collection(force_recreate=True)
-
-            if len(texts) != len(embeddings) or len(texts) != len(chunk_ids):
-                self.logger.error("Mismatch: texts (%d), embeddings (%d), chunk_ids (%d)", 
-                                 len(texts), len(embeddings), len(chunk_ids))
-                return False
-            if parent_ids and len(parent_ids) != len(texts):
-                self.logger.error("Mismatch: parent_ids (%d), texts (%d)", len(parent_ids), len(texts))
-                return False
-            if parent_file_paths and len(parent_file_paths) != len(texts):
-                self.logger.error("Mismatch: parent_file_paths (%d), texts (%d)", len(parent_file_paths), len(texts))
+            if not (len(texts) == len(embeddings) == len(chunk_ids) == len(parent_ids) == len(parent_file_paths)):
+                self.logger.error("Input lists have different lengths")
                 return False
 
-            parent_ids = parent_ids or [None] * len(texts)
-            parent_file_paths = parent_file_paths or [None] * len(texts)
-            subjects = [subject] * len(texts)
-            valid_entities = []
-            for i, (text, embedding, chunk_id, parent_id, parent_file_path) in enumerate(
-                zip(texts, embeddings, chunk_ids, parent_ids, parent_file_paths)
-            ):
-                if embedding.shape[0] != self.embedding_dim:
-                    self.logger.warning("Embedding for chunk %s has dimension %s, expected %d, skipping", 
-                                      chunk_id, embedding.shape, self.embedding_dim)
-                    continue
-                valid_entities.append((i, embedding.tolist(), chunk_id, text, subject, parent_id, parent_file_path))
+            batch_size = 100  # Adjust based on testing
+            total = len(texts)
+            self.logger.info("Storing %d vectors in Milvus with batch size %d", total, batch_size)
 
-            if not valid_entities:
-                self.logger.error("No valid entities to insert")
-                return False
-
-            ids, embeddings, chunk_ids, texts, subjects, parent_ids, parent_file_paths = map(list, zip(*valid_entities))
-
-            entities = [ids, embeddings, chunk_ids, texts, subjects, parent_ids, parent_file_paths]
-            insertion_result = self.collection.insert(entities)
-            self.collection.flush()
-            self.logger.info("Inserted %d entities into collection %s", len(insertion_result.primary_keys), self.collection_name)
-
-            if not self.collection.has_index():
-                index_params = {
-                    "index_type": "IVF_FLAT",
-                    "metric_type": "L2",
-                    "params": {"nlist": 128}
-                }
-                self.collection.create_index(field_name="embedding", index_params=index_params)
-                self.logger.info("Index created on 'embedding' field")
-
+            # Get the current maximum ID to avoid conflicts
             self.collection.load()
-            self.logger.info("Collection %s loaded and ready for search", self.collection_name)
+            max_id = 0
+            try:
+                result = self.collection.query(expr="id >= 0", output_fields=["id"], limit=1, sort_field="id", sort_order="desc")
+                if result:
+                    max_id = result[0]["id"]
+            except Exception as e:
+                self.logger.warning("Could not retrieve max ID, starting from 1: %s", str(e))
+
+            for i in range(0, total, batch_size):
+                batch_texts = texts[i:i + batch_size]
+                batch_embeddings = [emb.tolist() for emb in embeddings[i:i + batch_size]]
+                batch_chunk_ids = chunk_ids[i:i + batch_size]
+                batch_parent_ids = parent_ids[i:i + batch_size]
+                batch_parent_file_paths = parent_file_paths[i:i + batch_size]
+                batch_subjects = [subject] * len(batch_texts)
+                # Generate sequential IDs starting from max_id + 1
+                batch_ids = list(range(max_id + 1, max_id + 1 + len(batch_texts)))
+                max_id += len(batch_texts)
+
+                # Insert data as a list of field values, including explicit 'id'
+                data = [
+                    batch_ids,               # id
+                    batch_embeddings,        # embedding
+                    batch_chunk_ids,         # chunk_id
+                    batch_texts,             # text
+                    batch_subjects,          # subject
+                    batch_parent_ids,        # parent_id
+                    batch_parent_file_paths  # parent_file_path
+                ]
+                self.collection.insert(data)
+                self.logger.debug("Inserted batch %d-%d of %d", i, min(i + batch_size, total), total)
+
+            self.collection.flush()
+            self.logger.info("Successfully stored %d vectors in Milvus", total)
+
+            # Update metadata
+            for chunk_id, parent_id, parent_file_path in zip(chunk_ids, parent_ids, parent_file_paths):
+                self.metadata.append({
+                    "chunk_id": chunk_id,
+                    "parent_id": parent_id,
+                    "parent_file_path": str(parent_file_path)
+                })
+            with open(self.metadata_path, "w", encoding="utf-8") as f:
+                json.dump(self.metadata, f, ensure_ascii=False, indent=2)
+            self.logger.info("Updated metadata at %s", self.metadata_path)
             return True
         except Exception as e:
             self.logger.error("Failed to store vectors: %s", str(e))
             return False
-
+        
     def bulk_insert(self, texts_dir: Optional[str] = None) -> bool:
         """
         Perform bulk insertion of all chunk texts and embeddings using metadata.
@@ -224,10 +246,7 @@ class VectorStore:
             bool: True if bulk insertion succeeds, False otherwise.
         """
         try:
-            # Rrecreate collection
-            # if has_collection(self.collection_name):
-            #     Collection(self.collection_name).drop()
-            #     self.logger.info("Dropped existing collection: %s", self.collection_name)
+            # Initialize collection
             self.collection = self._create_collection(force_recreate=False)
 
             # Load embedding metadata
@@ -287,8 +306,7 @@ class VectorStore:
                 chunk_ids=chunk_ids,
                 subject="courthouse",
                 parent_ids=parent_ids,
-                parent_file_paths=parent_file_paths,
-                force_recreate=False
+                parent_file_paths=parent_file_paths
             )
             if success:
                 self.logger.info("Bulk insertion completed: %d triplets inserted", total_triplets)
