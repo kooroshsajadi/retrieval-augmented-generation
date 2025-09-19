@@ -31,11 +31,13 @@ class HybridRetriever:
 
     def _initialize_bm25(self):
         try:
-            texts, ids = self.milvus_connector.get_all_texts()
+            texts, ids, parent_ids, parent_file_paths = self.milvus_connector.get_all_texts()
             tokenized_texts = [text.split() for text in texts]
             self.bm25 = BM25Okapi(tokenized_texts)
             self.texts = texts
             self.ids = ids
+            self.parent_ids = parent_ids
+            self.parent_file_paths = parent_file_paths
             self.logger.info("BM25 index initialized successfully.")
         except Exception as e:
             self.logger.error(f"Failed to initialize BM25 index: {str(e)}")
@@ -51,25 +53,35 @@ class HybridRetriever:
             vector_weight (float): Weight for vector search score (0 to 1).
 
         Returns:
-            List[Dict[str, Any]]: Merged results with chunk_id, text, and score.
+            List[Dict[str, Any]]: Merged results with chunk_id, text, score, parent_id, parent_file_path.
         """
         try:
             # Vector search
             query_vector = self.query_encoder.encode_query(query)
-            vector_results = self.milvus_connector.search(query_vector, top_k)
+            vector_results = self.milvus_connector.search(
+                query_vector,
+                top_k,
+                output_fields=["chunk_id", "text", "parent_id", "parent_file_path"]
+            )
             vector_scores = {res["chunk_id"]: res["distance"] for res in vector_results}
 
             # BM25 search
             tokenized_query = query.split()
             bm25_scores = self.bm25.get_scores(tokenized_query)
             bm25_results = [
-                {"chunk_id": self.ids[i], "text": self.texts[i], "score": score}
+                {
+                    "chunk_id": self.ids[i],
+                    "text": self.texts[i],
+                    "score": score,
+                    "parent_id": self.parent_ids[i],
+                    "parent_file_path": self.parent_file_paths[i]
+                }
                 for i, score in enumerate(bm25_scores) if score > 0
             ]
             bm25_results = sorted(bm25_results, key=lambda x: x["score"], reverse=True)[:top_k]
 
-            # Normalize scores (vector: cosine similarity, BM25: raw scores)
-            max_vector_score = max(vector_scores.values(), default=1.0)
+            # Normalize scores
+            max_vector_score = max(vector_scores.values(), default=1.0) or 1.0
             max_bm25_score = max([r["score"] for r in bm25_results], default=1.0) or 1.0
             merged_results = {}
             for res in vector_results:
@@ -78,7 +90,9 @@ class HybridRetriever:
                 merged_results[chunk_id] = {
                     "chunk_id": chunk_id,
                     "text": res["text"],
-                    "score": score * vector_weight
+                    "score": score * vector_weight,
+                    "parent_id": res["parent_id"],
+                    "parent_file_path": res["parent_file_path"]
                 }
             for res in bm25_results:
                 chunk_id = res["chunk_id"]
@@ -89,14 +103,13 @@ class HybridRetriever:
                     merged_results[chunk_id] = {
                         "chunk_id": chunk_id,
                         "text": res["text"],
-                        "score": score * (1 - vector_weight)
+                        "score": score * (1 - vector_weight),
+                        "parent_id": res["parent_id"],
+                        "parent_file_path": res["parent_file_path"]
                     }
 
-            # Sort by combined score
-            final_results = list(merged_results.values())
-            final_results = sorted(final_results, key=lambda x: x["score"], reverse=True)[:top_k]
+            final_results = sorted(merged_results.values(), key=lambda x: x["score"], reverse=True)[:top_k]
             return final_results
-
         except Exception as e:
             self.logger.error(f"Hybrid retrieval failed for query '{query}': {str(e)}")
             raise

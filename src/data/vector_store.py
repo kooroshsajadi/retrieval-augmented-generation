@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Optional
 import numpy as np
 import logging
+import json
 import argparse
 from pymilvus import (
     connections, has_collection,
@@ -17,9 +18,10 @@ class VectorStore:
         collection_name: str = "gotmat_collection",
         milvus_host: str = "localhost",
         milvus_port: str = "19530",
-        embedding_dim: int = 1024,
-        chunks_dir: str = "data/chunks/prefettura_v1.2_chunks",
-        embeddings_dir: str = "data/embeddings/prefettura_v1.2_embeddings",
+        embedding_dim: int = 768,  # Matches dlicari/Italian-Legal-BERT-SC
+        chunks_dir: str = "data/chunks/prefettura_v1.3_chunks",
+        embeddings_dir: str = "data/embeddings/prefettura_v1.3_embeddings",
+        metadata_path: str = "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json",
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -32,6 +34,7 @@ class VectorStore:
             embedding_dim (int): Dimension of embedding vectors.
             chunks_dir (str): Directory containing chunked text files.
             embeddings_dir (str): Directory containing embedding files (.npy).
+            metadata_path (str): Path to embedding metadata file.
             logger (Optional[logging.Logger]): Logger instance, defaults to None.
         """
         self.collection_name = collection_name
@@ -40,8 +43,15 @@ class VectorStore:
         self.embedding_dim = embedding_dim
         self.chunks_dir = Path(chunks_dir)
         self.embeddings_dir = Path(embeddings_dir)
+        self.metadata_path = Path(metadata_path)
         self.logger = logger or setup_logger("src.data.vector_store")
         
+        # Validate directories
+        for dir_path in [self.chunks_dir, self.embeddings_dir]:
+            if not dir_path.exists():
+                self.logger.error("Directory not found: %s", dir_path)
+                raise FileNotFoundError(f"Directory not found: {dir_path}")
+
         # Connect to Milvus
         try:
             connections.connect(alias="default", host=self.milvus_host, port=self.milvus_port)
@@ -51,19 +61,19 @@ class VectorStore:
             raise
 
         # Initialize collection
-        self.collection = self._create_collection(force_recreate=False)
+        # self.collection = self._create_collection(force_recreate=False)
 
-    def _load_chunk_text(self, chunk_id: str) -> str:
+    def _load_chunk_text(self, file_path: str) -> str:
         """
-        Load text for a given chunk ID from the chunks directory.
+        Load text for a given chunk file path.
 
         Args:
-            chunk_id (str): ID of the chunk (filename stem).
+            file_path (str): Path to the chunk file.
 
         Returns:
             str: Chunk text, or empty string if not found.
         """
-        chunk_file = self.chunks_dir / f"{chunk_id}.txt"
+        chunk_file = Path(file_path)
         try:
             with open(chunk_file, "r", encoding="utf-8") as f:
                 self.logger.debug("Loaded chunk text from %s", chunk_file)
@@ -72,23 +82,32 @@ class VectorStore:
             self.logger.warning("Chunk text file %s not found", chunk_file)
             return ""
 
-    def _read_chunk_file_names(self) -> List[str]:
+    def _load_embedding_metadata(self) -> List[dict]:
         """
-        Read all .txt file stems in the chunks directory to get valid chunk IDs.
+        Load embedding metadata from the metadata file.
 
         Returns:
-            List[str]: Sorted list of chunk ID strings (filename stems).
+            List[dict]: List of file metadata dictionaries.
         """
-        chunk_file_names = sorted([file_path.stem for file_path in self.chunks_dir.glob("*.txt")])
-        self.logger.info("Found %d chunk text files in %s", len(chunk_file_names), self.chunks_dir)
-        return chunk_file_names
+        if not self.metadata_path.exists():
+            self.logger.error("Embedding metadata file not found: %s", self.metadata_path)
+            raise FileNotFoundError(f"Embedding metadata file not found: {self.metadata_path}")
+
+        try:
+            with open(self.metadata_path, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+            self.logger.info("Loaded embedding metadata from %s", self.metadata_path)
+            return metadata
+        except Exception as e:
+            self.logger.error("Failed to load embedding metadata: %s", str(e))
+            raise
 
     def _create_collection(self, force_recreate: bool = False) -> Collection:
         """
         Create or use existing Milvus collection with the defined schema.
 
         Args:
-            force_recreate (bool): If True, drop and recreate the collection; if False, use existing collection or create if absent.
+            force_recreate (bool): If True, drop and recreate the collection; if False, use existing or create.
 
         Returns:
             Collection: Milvus collection object.
@@ -99,15 +118,15 @@ class VectorStore:
             FieldSchema(name="chunk_id", dtype=DataType.VARCHAR, max_length=150),
             FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
             FieldSchema(name="subject", dtype=DataType.VARCHAR, max_length=100),
+            FieldSchema(name="parent_id", dtype=DataType.VARCHAR, max_length=100),
+            FieldSchema(name="parent_file_path", dtype=DataType.VARCHAR, max_length=500)  # Added for parent chunk access
         ]
         schema = CollectionSchema(fields=fields, description="Collection of embeddings with metadata")
 
-        # Drop collection if force_recreate is True
         if force_recreate and has_collection(self.collection_name):
             Collection(self.collection_name).drop()
             self.logger.info("Dropped existing collection: %s", self.collection_name)
 
-        # Create collection if it doesn't exist
         if not has_collection(self.collection_name):
             collection = Collection(name=self.collection_name, schema=schema)
             self.logger.info("Created collection: %s", self.collection_name)
@@ -117,59 +136,67 @@ class VectorStore:
 
         return collection
 
-    def store_vectors(self, texts: List[str], embeddings: List[np.ndarray], chunk_ids: Optional[List[str]] = None, subject: str = "courthouse", force_recreate: bool = False) -> bool:
+    def store_vectors(self, texts: List[str],
+                      embeddings: List[np.ndarray],
+                      chunk_ids: List[str],
+                      subject: str = "courthouse",
+                      parent_ids: Optional[List[str]] = None,
+                      parent_file_paths: Optional[List[str]] = None,
+                      force_recreate: bool = False) -> bool:
         """
         Store embeddings and associated metadata in Milvus.
 
         Args:
             texts (List[str]): List of chunk texts.
             embeddings (List[np.ndarray]): List of embedding vectors.
-            chunk_ids (Optional[List[str]]): List of chunk IDs, defaults to None (auto-generated).
+            chunk_ids (List[str]): List of chunk IDs.
             subject (str): Subject metadata for all chunks (default: 'courthouse').
-            force_recreate (bool): If True, recreate the collection before insertion; if False, append to existing collection.
+            parent_ids (List[str]): List of parent IDs for parent chunking.
+            parent_file_paths (List[str]): List of parent file paths for parent chunk access.
+            force_recreate (bool): If True, recreate the collection before insertion.
 
         Returns:
             bool: True if insertion and indexing succeed, False otherwise.
         """
         try:
-            # Recreate collection if force_recreate is True
             if force_recreate:
                 self.collection = self._create_collection(force_recreate=True)
 
-            # Validate inputs
-            if len(texts) != len(embeddings):
-                self.logger.error("Mismatch between number of texts (%d) and embeddings (%d)", len(texts), len(embeddings))
+            if len(texts) != len(embeddings) or len(texts) != len(chunk_ids):
+                self.logger.error("Mismatch: texts (%d), embeddings (%d), chunk_ids (%d)", 
+                                 len(texts), len(embeddings), len(chunk_ids))
                 return False
-            if chunk_ids and len(chunk_ids) != len(texts):
-                self.logger.error("Mismatch between number of chunk IDs (%d) and texts (%d)", len(chunk_ids), len(texts))
+            if parent_ids and len(parent_ids) != len(texts):
+                self.logger.error("Mismatch: parent_ids (%d), texts (%d)", len(parent_ids), len(texts))
+                return False
+            if parent_file_paths and len(parent_file_paths) != len(texts):
+                self.logger.error("Mismatch: parent_file_paths (%d), texts (%d)", len(parent_file_paths), len(texts))
                 return False
 
-            # Prepare data for insertion
-            ids = list(range(len(texts)))
-            if chunk_ids is None:
-                chunk_ids = [f"chunk_{i}" for i in ids]
+            parent_ids = parent_ids or [None] * len(texts)
+            parent_file_paths = parent_file_paths or [None] * len(texts)
             subjects = [subject] * len(texts)
             valid_entities = []
-            for i, (text, embedding, chunk_id) in enumerate(zip(texts, embeddings, chunk_ids)):
+            for i, (text, embedding, chunk_id, parent_id, parent_file_path) in enumerate(
+                zip(texts, embeddings, chunk_ids, parent_ids, parent_file_paths)
+            ):
                 if embedding.shape[0] != self.embedding_dim:
-                    self.logger.warning("Embedding for chunk %s has unexpected dimension %s, skipping", chunk_id, embedding.shape)
+                    self.logger.warning("Embedding for chunk %s has dimension %s, expected %d, skipping", 
+                                      chunk_id, embedding.shape, self.embedding_dim)
                     continue
-                valid_entities.append((i, embedding.tolist(), chunk_id, text, subject))
+                valid_entities.append((i, embedding.tolist(), chunk_id, text, subject, parent_id, parent_file_path))
 
             if not valid_entities:
                 self.logger.error("No valid entities to insert")
                 return False
 
-            # Unzip valid entities
-            ids, embeddings, chunk_ids, texts, subjects = map(list, zip(*valid_entities))
+            ids, embeddings, chunk_ids, texts, subjects, parent_ids, parent_file_paths = map(list, zip(*valid_entities))
 
-            # Insert into Milvus
-            entities = [list(ids), list(embeddings), list(chunk_ids), list(texts), list(subjects)]
+            entities = [ids, embeddings, chunk_ids, texts, subjects, parent_ids, parent_file_paths]
             insertion_result = self.collection.insert(entities)
             self.collection.flush()
             self.logger.info("Inserted %d entities into collection %s", len(insertion_result.primary_keys), self.collection_name)
 
-            # Create index (only if no index exists)
             if not self.collection.has_index():
                 index_params = {
                     "index_type": "IVF_FLAT",
@@ -179,7 +206,6 @@ class VectorStore:
                 self.collection.create_index(field_name="embedding", index_params=index_params)
                 self.logger.info("Index created on 'embedding' field")
 
-            # Load collection for search
             self.collection.load()
             self.logger.info("Collection %s loaded and ready for search", self.collection_name)
             return True
@@ -189,7 +215,7 @@ class VectorStore:
 
     def bulk_insert(self, texts_dir: Optional[str] = None) -> bool:
         """
-        Perform bulk insertion of all chunk texts and embeddings from directories.
+        Perform bulk insertion of all chunk texts and embeddings using metadata.
 
         Args:
             texts_dir (Optional[str]): Directory containing original text files, defaults to None.
@@ -198,57 +224,74 @@ class VectorStore:
             bool: True if bulk insertion succeeds, False otherwise.
         """
         try:
-            # Ensure directories exist
-            for dir_path in [self.chunks_dir, self.embeddings_dir]:
-                if not dir_path.exists():
-                    self.logger.error("Directory not found: %s", dir_path)
-                    return False
+            # Rrecreate collection
+            # if has_collection(self.collection_name):
+            #     Collection(self.collection_name).drop()
+            #     self.logger.info("Dropped existing collection: %s", self.collection_name)
+            self.collection = self._create_collection(force_recreate=False)
 
-            # Get chunk IDs from chunk files
-            chunk_ids = self._read_chunk_file_names()
-            if not chunk_ids:
-                self.logger.error("No chunk files found in %s", self.chunks_dir)
+            # Load embedding metadata
+            metadata = self._load_embedding_metadata()
+            if not metadata:
+                self.logger.error("No embedding metadata found")
                 return False
 
-            # Load texts and embeddings
             texts = []
             embeddings = []
-            valid_chunk_ids = []
-            for chunk_id in chunk_ids:
-                # Load chunk text
-                text = self._load_chunk_text(chunk_id)
-                if not text:
-                    self.logger.warning("Skipping chunk %s due to empty or missing text", chunk_id)
+            chunk_ids = []
+            parent_ids = []
+            parent_file_paths = []
+
+            for file_metadata in metadata:
+                if not file_metadata["is_valid"]:
+                    self.logger.warning("Skipping invalid file: %s", file_metadata["file_path"])
                     continue
 
-                # Load embedding
-                embedding_file = self.embeddings_dir / f"{chunk_id}.npy"
-                try:
-                    embedding = np.load(embedding_file)
-                    if embedding.shape[0] != self.embedding_dim:
-                        self.logger.warning("Embedding for chunk %s has unexpected dimension %s, skipping", chunk_id, embedding.shape)
+                for chunk_meta in file_metadata["chunk_embeddings"]:
+                    if not chunk_meta["is_valid"]:
+                        self.logger.warning("Skipping invalid chunk: %s", chunk_meta["chunk_id"])
                         continue
-                except FileNotFoundError:
-                    self.logger.warning("Embedding file %s not found, skipping", embedding_file)
-                    continue
 
-                texts.append(text)
-                embeddings.append(embedding)
-                valid_chunk_ids.append(chunk_id)
+                    # Load chunk text
+                    text = self._load_chunk_text(chunk_meta["file_path"])
+                    if not text:
+                        self.logger.warning("Skipping chunk %s due to empty or missing text", chunk_meta["chunk_id"])
+                        continue
 
-            if not texts:
-                self.logger.error("No valid texts or embeddings to insert")
+                    # Load embedding
+                    embedding_file = self.embeddings_dir / chunk_meta["embedding_file"]
+                    try:
+                        embedding = np.load(embedding_file)
+                        if embedding.shape[0] != self.embedding_dim:
+                            self.logger.warning("Embedding for chunk %s has dimension %s, expected %d, skipping", 
+                                              chunk_meta["chunk_id"], embedding.shape, self.embedding_dim)
+                            continue
+                    except FileNotFoundError:
+                        self.logger.warning("Embedding file %s not found, skipping", embedding_file)
+                        continue
+
+                    texts.append(text)
+                    embeddings.append(embedding)
+                    chunk_ids.append(chunk_meta["chunk_id"])
+                    parent_ids.append(chunk_meta["parent_id"])
+                    parent_file_paths.append(chunk_meta["parent_file_path"])
+
+            total_triplets = len(chunk_ids)
+            if not total_triplets:
+                self.logger.error("No valid text-embedding pairs to insert")
                 return False
 
             success = self.store_vectors(
                 texts=texts,
                 embeddings=embeddings,
-                chunk_ids=valid_chunk_ids,
+                chunk_ids=chunk_ids,
                 subject="courthouse",
-                force_recreate=True
+                parent_ids=parent_ids,
+                parent_file_paths=parent_file_paths,
+                force_recreate=False
             )
             if success:
-                self.logger.info("Bulk insertion completed successfully for %d chunks", len(valid_chunk_ids))
+                self.logger.info("Bulk insertion completed: %d triplets inserted", total_triplets)
             else:
                 self.logger.error("Bulk insertion failed")
             return success
@@ -261,20 +304,18 @@ if __name__ == "__main__":
     parser.add_argument("--collection_name", type=str, default="gotmat_collection", help="Milvus collection name")
     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
-    parser.add_argument("--embedding_dim", type=int, default=1024, help="Dimension of embedding vectors")
+    parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")
     parser.add_argument("--chunks_dir", type=str, default="data/chunks/prefettura_v1.3_chunks", help="Directory containing chunked text files")
     parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/prefettura_v1.3_embeddings", help="Directory containing embedding files")
-    parser.add_argument("--texts_dir", type=str, default=None, help="Directory containing original text files (optional)")
+    parser.add_argument("--metadata_path", type=str, default="data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json", help="Embedding metadata file")
     args = parser.parse_args()
 
-    # Set up logger
     logger = setup_logger("src.data.vector_store")
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(handler)
 
-    # Initialize VectorStore
     vector_store = VectorStore(
         collection_name=args.collection_name,
         milvus_host=args.milvus_host,
@@ -282,11 +323,11 @@ if __name__ == "__main__":
         embedding_dim=args.embedding_dim,
         chunks_dir=args.chunks_dir,
         embeddings_dir=args.embeddings_dir,
+        metadata_path=args.metadata_path,
         logger=logger
     )
 
-    # Perform bulk insertion
-    success = vector_store.bulk_insert(texts_dir=args.texts_dir)
+    success = vector_store.bulk_insert()
     if success:
         logger.info("Bulk insertion completed successfully")
     else:

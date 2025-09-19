@@ -5,12 +5,12 @@ from src.utils.logging_utils import setup_logger
 
 class Reranker:
     """Reranks retrieved chunks using a cross-encoder model."""
-    def __init__(self, model_name: str, logger: Optional[logging.Logger] = None):
+    def __init__(self, model_name: str = "dlicari/Italian-Legal-BERT", logger: Optional[logging.Logger] = None):
         """
         Initialize Reranker.
 
         Args:
-            model_name (str): Cross-encoder model name.
+            model_name (str): Cross-encoder model name (Italian-specific).
             logger (logging.Logger): Logger instance.
         """
         self.model = CrossEncoder(model_name, max_length=512)
@@ -23,20 +23,26 @@ class Reranker:
 
         Args:
             query (str): User query (in Italian).
-            chunks (List[Dict[str, Any]]): Retrieved chunks with chunk_id, text, and score.
+            chunks (List[Dict[str, Any]]): Retrieved chunks with chunk_id, text, score, parent_id, parent_file_path.
             top_k (int): Number of chunks to return after reranking.
 
         Returns:
-            List[Dict[str, Any]]: Reranked chunks with chunk_id, text, and score.
+            List[Dict[str, Any]]: Reranked chunks with chunk_id, text, score, parent_id, parent_file_path.
         """
         try:
             # Prepare query-chunk pairs
             pairs = [[query, chunk["text"]] for chunk in chunks]
             scores = self.model.predict(pairs)
 
-            # Update scores and sort
+            # Update scores and preserve metadata
             reranked_chunks = [
-                {"chunk_id": chunk["chunk_id"], "text": chunk["text"], "score": float(score)}
+                {
+                    "chunk_id": chunk["chunk_id"],
+                    "text": chunk["text"],
+                    "score": float(score),
+                    "parent_id": chunk.get("parent_id"),
+                    "parent_file_path": chunk.get("parent_file_path")
+                }
                 for chunk, score in zip(chunks, scores)
             ]
             reranked_chunks = sorted(reranked_chunks, key=lambda x: x["score"], reverse=True)[:top_k]

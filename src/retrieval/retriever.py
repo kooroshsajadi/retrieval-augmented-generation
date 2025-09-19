@@ -12,11 +12,11 @@ class MilvusRetriever:
     """Orchestrator for hybrid retrieval and reranking in RAG pipeline."""
     def __init__(
         self,
-        collection_name: str = "legal_texts",
-        embedding_model: str = EncoderModels.MULTILINGUAL_E5_LARGE_INSTRUCT.value,
+        collection_name: str = "gotmat_collection",
+        embedding_model: str = EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
         milvus_host: str = "localhost",
         milvus_port: str = "19530",
-        reranker_model: str = CrossEncoderModels.MS_MARCO_MINILM_L12_V2.value,
+        reranker_model: str = "dlicari/Italian-Legal-BERT",  # Italian-specific cross-encoder
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -24,7 +24,7 @@ class MilvusRetriever:
 
         Args:
             collection_name (str): Milvus collection name.
-            embedding_model (str): SentenceTransformer model for query encoding (from EmbeddingModel Enum).
+            embedding_model (str): SentenceTransformer model for query encoding.
             milvus_host (str): Milvus server host.
             milvus_port (str): Milvus server port.
             reranker_model (str): Cross-encoder model for reranking.
@@ -59,13 +59,13 @@ class MilvusRetriever:
             hybrid_weight (float): Weight for vector search score in hybrid retrieval (0 to 1).
 
         Returns:
-            List[Dict[str, Any]]: Reranked chunks with chunk_id, text, and score.
+            List[Dict[str, Any]]: Reranked child chunks with chunk_id, text, score, parent_id, parent_file_path.
         """
         try:
             # Step 1: Hybrid retrieval
             hybrid_results = self.hybrid_retriever.retrieve_hybrid(
                 query=query,
-                top_k=top_k * 3,  # Retrieve more candidates for reranking
+                top_k=top_k * 3,
                 vector_weight=hybrid_weight
             )
             self.logger.info(f"Hybrid retrieval returned {len(hybrid_results)} chunks for query: {query[:50]}...")
@@ -81,4 +81,32 @@ class MilvusRetriever:
 
         except Exception as e:
             self.logger.error(f"Retrieval failed for query '{query}': {str(e)}")
+            raise
+
+    def fetch_parent_texts(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Fetch parent chunk texts for the retrieved child chunks.
+
+        Args:
+            results (List[Dict[str, Any]]): Retrieved chunks with parent_file_path.
+
+        Returns:
+            List[Dict[str, Any]]: Results with added parent_text field.
+        """
+        try:
+            for result in results:
+                parent_file_path = result.get("parent_file_path")
+                if parent_file_path:
+                    try:
+                        with open(parent_file_path, "r", encoding="utf-8") as f:
+                            result["parent_text"] = f.read()
+                        self.logger.debug(f"Loaded parent text from {parent_file_path}")
+                    except FileNotFoundError:
+                        self.logger.warning(f"Parent file {parent_file_path} not found")
+                        result["parent_text"] = ""
+                else:
+                    result["parent_text"] = ""
+            return results
+        except Exception as e:
+            self.logger.error(f"Failed to fetch parent texts: {str(e)}")
             raise
