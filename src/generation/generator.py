@@ -4,6 +4,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.models.model_loader import ModelLoader
 from src.utils.logging_utils import setup_logger
 import torch
+from src.utils.models.model_utils import create_and_configure_tokenizer
 
 class LLMGenerator:
     """Generates responses using a language model for the RAG pipeline."""
@@ -44,30 +45,31 @@ class LLMGenerator:
                 device_map=self.device
             )
             self.model = self.model_loader.model
-            self.tokenizer = self.model_loader.tokenizer
-            self.logger.info("Loaded model %s on %s", model_path, self.device)
+            tokenizer_source = tokenizer_path if tokenizer_path is not None else model_path
+            self.tokenizer = create_and_configure_tokenizer(model=self.model, model_name=model_path, tokenizer_path=tokenizer_source)
+            self.logger.info("Loaded model %s and tokenizer %s on %s", model_path, tokenizer_source, self.device)
         except Exception as e:
             self.logger.error("Failed to load model or tokenizer: %s", str(e))
             raise
 
     def format_prompt(self, query: str, contexts: str) -> str:
         """
-        Format the input prompt with instructions for the LLM.
+        Format the input prompt with instructions for the LLM in Italian.
 
         Args:
             query (str): User query.
             contexts (str): Contexts from Augmenter (child and parent texts).
 
         Returns:
-            str: Formatted prompt with instructions.
+            str: Formatted prompt with instructions, query, and contexts.
         """
         instruction = (
-            "You are a legal assistant specializing in Italian law. Answer the query in Italian, "
-            "using the provided child and parent contexts as reference. The child contexts provide "
-            "specific details, while the parent contexts offer broader legal context. Synthesize a "
-            "concise and accurate response without repeating the query or contexts verbatim."
+            "Sei un assistente legale specializzato in diritto italiano. Rispondi alla query in italiano, "
+            "utilizzando i contesti figlio e genitore forniti come riferimento. I contesti figlio forniscono "
+            "dettagli specifici, mentre i contesti genitore offrono un contesto legale più ampio. Fornisci una "
+            "risposta concisa e accurata senza ripetere verbatim la query o i contesti."
         )
-        return f"{instruction}\n\n{contexts}"
+        return f"{instruction}\n\n**Query**: {query}\n\n**Contesti**:\n{contexts}"
 
     def generate(self, prompt: str, max_new_tokens: int = 200) -> str:
         """
@@ -103,7 +105,19 @@ class LLMGenerator:
             )
 
             # Decode response, skipping the input prompt
+            print(outputs)
+            print("_"*15)
+            print(inputs["input_ids"].shape[1])
+            print("_"*15)
+            print(inputs["input_ids"].shape)
+            print("_"*15)
+            print(outputs[0].shape)
+            print("_"*15)
+            print(outputs[0][inputs["input_ids"].shape[1]:])
             response = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+            response2 = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            print(f"Response: {response}")
+            print(f"Response: {response2}")
             self.logger.info("Generated response for query: %s...", query[:50])
             return response.strip()
         except Exception as e:
