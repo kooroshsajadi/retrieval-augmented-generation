@@ -36,30 +36,34 @@ class MilvusConnector:
             self.logger.error(f"Failed to connect to Milvus: {str(e)}")
             raise
 
-    def search(self, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query_vector: List[float], top_k: int = 5, output_fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Perform vector search in Milvus collection.
 
         Args:
             query_vector (List[float]): Query embedding vector.
             top_k (int): Number of chunks to retrieve.
+            output_fields (List[str], optional): Fields to retrieve from Milvus. Defaults to ["chunk_id", "text", "parent_id", "parent_file_path"].
 
         Returns:
-            List[Dict[str, Any]]: Retrieved chunks with chunk_id, text, and distance.
+            List[Dict[str, Any]]: Retrieved chunks with requested fields and distance.
         """
         try:
             search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
+            output_fields = output_fields or ["chunk_id", "text", "parent_id", "parent_file_path"]
             results = self.collection.search(
                 data=[query_vector],
                 anns_field="embedding",
                 param=search_params,
                 limit=top_k,
-                output_fields=["chunk_id", "text"]
+                output_fields=output_fields
             )
             retrieved = [
                 {
-                    "chunk_id": hit.entity.get("chunk_id"),
-                    "text": hit.entity.get("text"),
+                    "chunk_id": hit.entity.get("chunk_id", ""),
+                    "text": hit.entity.get("text", ""),
+                    "parent_id": hit.entity.get("parent_id", ""),
+                    "parent_file_path": hit.entity.get("parent_file_path", ""),
                     "distance": hit.distance
                 }
                 for hit in results[0]
