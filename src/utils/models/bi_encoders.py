@@ -22,6 +22,10 @@ class EncoderModels(Enum):
     # BERT-based model for Italian text, suitable for generating embeddings or classification.
     BERT_BASE_ITALIAN_CASED = "dbmdz/bert-base-italian-cased"
     
+    # Embedding size: 768, max tokens: 512, suitable for medium to high-performance machines (CPU or GPU with 4GB+ VRAM).
+    # Distilled Italian Legal BERT, lightweight and efficient for embedding and reranking tasks in the legal domain.
+    DISTIL_ITA_LEGAL_BERT = "dlicari/distil-ita-legal-bert"
+    
     # Embedding size: 768, max tokens: 128, suitable for medium-performance machines (CPU or GPU with 4GB+ VRAM).
     # Optimized for paraphrase detection and multilingual embeddings, ideal for shorter legal texts.
     PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2 = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
