@@ -9,3 +9,4 @@ MODEL_TYPE_MAPPING = {
 class ModelTypes(Enum):
     SEQ2SEQ = "seq2seq"
     ENCODER_ONLY = "encoder-only"
+    CASUAL = "causal"  # For models like GPT, LLaMA, etc.
