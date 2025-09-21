@@ -20,3 +20,9 @@ class LargeLanguageModels(Enum):
     # Designed for high-quality legal dialog, reasoning, and instruction following, supporting multilingual generation and code tasks.
     # Suitable for high-performance servers (GPU with 16GB+ VRAM). Best for legal RAG generation and assistant-style response tasks.
     LLAMA_3_8B_INSTRUCT = "meta-llama/Meta-Llama-3-8B-Instruct"
+
+    # GPT-2 Large: ~774M parameters, auto-regressive transformer (decoder-only) for general-purpose text generation.
+    OPENAI_GPT2_LARGE = "openai-community/gpt2-large"
+
+    # GPT-2 Distil: ~82M parameters, distilled version of GPT-2 for efficient text generation.
+    OPENAI_GPT2_DISTIL = "distilbert/distilgpt2"
