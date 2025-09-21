@@ -90,7 +90,7 @@ class RAGOrchestrator:
         self.generator = LLMGenerator(
             model_path=self.config['model'].get("model_path", LargeLanguageModels.MBART_LARGE_50.value),
             # adapter_path=self.config.get("adapter_path", None),
-            # tokenizer_path=self.config.get("tokenizer_path", None),
+            tokenizer_path=self.config.get("tokenizer_path", None),
             model_type=ModelTypes.SEQ2SEQ.value,
             max_length=self.config.get("max_input_tokenization_length", 2048),
             device=self.config.get("device", "auto"),

@@ -7,11 +7,12 @@ data:
   destination: data/results
   embeddings: data/embeddings/main
 model:
-  reranker_model: "dlicari/Italian-Legal-BERT"
-  model_path: facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
-  adapter_path: models/fine_tuned_models/opus-mt-it-en-v1/model
-  tokenizer_path: models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
-  embedding_model: "dlicari/Italian-Legal-BERT-SC"
+  model_type: causal
+  reranker_model: dlicari/distil-ita-legal-bert #"dlicari/Italian-Legal-BERT"
+  model_path: meta-llama/Meta-Llama-3-8B-Instruct #"dlicari/Italian-Legal-BERT-SC" #facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
+  adapter_path: #models/fine_tuned_models/opus-mt-it-en-v1/model
+  tokenizer_path: #"dlicari/Italian-Legal-BERT-SC" #"meta-llama/Meta-Llama-3-8B-Instruct" #facebook/mbart-large-50   #models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
+  embedding_model: dlicari/distil-ita-legal-bert #"dlicari/Italian-Legal-BERT-SC" #"dlicari/Italian-Legal-BERT"  #intfloat/multilingual-e5-large-instruct 
 supported_formats:
   - .text
   - .txt
@@ -25,7 +26,7 @@ collection_name: gotmat_collection
 milvus_host: localhost
 milvus_port: 19530
 max_input_tokenization_length: 512
-max_new_tokens: 200
+max_new_tokens: 800
 device: auto
 max_chunk_words: 500
 max_chunk_length: 2000

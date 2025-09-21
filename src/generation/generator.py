@@ -42,7 +42,8 @@ class LLMGenerator:
                 model_type=model_type,
                 adapter_path=adapter_path,
                 tokenizer_path=tokenizer_path,
-                device_map=self.device
+                device_map=self.device,
+                max_length=self.max_length
             )
             self.model = self.model_loader.model
             tokenizer_source = tokenizer_path if tokenizer_path is not None else model_path
