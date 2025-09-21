@@ -1,6 +1,12 @@
 # Retrieval-Augmented Generation
 
-This project implements a Retrieval-Augmented Generation (RAG) pipeline for processing Italian PDFs, extracting text, and preparing data for GraphDB/Neo4j integration. Licensed under the Apache License 2.0.
+This repository provides a fully modular implementation of a **Retrieval-Augmented Generation (RAG) pipeline** tailored for Italian legal-domain documents. The system handles the complete workflow: extracting and preprocessing raw text data, transforming it into dense vector representations, and storing embeddings efficiently in **Milvus** for retrieval. Beyond storage, it integrates a **hybrid retrieval approach** that combines BM25 with dense vector similarity, followed by reranking, to achieve high-quality, contextually relevant document retrieval.  
+
+The pipeline is optimized for modern machine learning hardware accelerators (e.g., GPUs or specialized inference hardware), and parameters are configurable to adapt to different workloads.
+
+Designed with modularity in mind, each component can be run independently as a Python module, while the entire pipeline can be orchestrated through a central entry point. This makes experimentation, debugging, and production deployment more flexible.  
+
+The project is licensed under the **Apache License 2.0**, which permits both academic and commercial usage with proper attribution.
 
 ## 📦 Data Layer
 
@@ -20,20 +26,16 @@ This project implements a Retrieval-Augmented Generation (RAG) pipeline for proc
 ## 📝 Logging
 
 Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
-
-## 📚 Data Sources
-
-- **Knowledge Graph of the Italian Legislation**
-  - Colombo, A. (2024). Knowledge Graph of the Italian Legislation [Data set]. Zenodo. DOI: 10.5281/zenodo.13798158
  
-## 🚀 How to Run the Scripts in the Repository
+## 🚀 How to Run the Project
 
-Each script in this project is designed to be run as a module using Python's `-m` flag from the root directory of the repository. This ensures proper handling of relative imports in our modular codebase. An example is mentioned below:
+This project follows a modular structure, and each script can be executed as a module using Python's `-m` flag from the repository's root directory. This approach ensures that relative imports are resolved correctly.  
+
+To run the complete RAG pipeline (after installing all required dependencies), execute:
 
 ```
-python -m src.ingestion.text_ingestor
+python -m main
 ```
-Replace the above mentioned script path with your desired path.
 
 ## 🚧 Status
 
