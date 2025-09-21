@@ -35,6 +35,10 @@ python -m src.ingestion.text_ingestor
 ```
 Replace the above mentioned script path with your desired path.
 
+## 🚧 Status
+
+> **Note**: This project is **under active development**. Expect changes in structure and functionality in the near future. Currently focused on document deduplication management.
+
 ## 📄 License
 
 This project is licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0) (the "License"). You may not use, copy, modify, or distribute this project except in compliance with the License. A copy of the License is included in the [LICENSE](./LICENSE) file in this repository.
