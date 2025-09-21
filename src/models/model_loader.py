@@ -18,7 +18,7 @@ class ModelLoader:
         device_map: str = "auto",
         adapter_path: Optional[str] = None,
         tokenizer_path: Optional[str] = None,
-        max_length: int = 128,
+        max_length: int = 512,
         logger: Optional[logging.Logger] = None
     ):
         """
