@@ -8,14 +8,9 @@ Designed with modularity in mind, each component can be run independently as a P
 
 The project is licensed under the **Apache License 2.0**, which permits both academic and commercial usage with proper attribution.
 
-## 📦 Data Layer
+## 🧱 Components
 
-### 🚛 Data Ingestion
-
-- [**file_classifier.py**](./src/ingestion/file_classifier.py): Classifies PDFs as text-based or image-based using `pdfplumber` and saves the result as metadata for later usage.
-- [**text_ingestor.py**](./src/ingestion/text_ingestor.py): Extracts text from files using `pdfplumber` (text-based), `Tesseract OCR` (image-based, `lang="ita"`), and `PyMuPDF` (images).
-- [**text_cleaner.py**](./src/ingestion/text_cleaner.py): Cleans the extracted text.
-- [**text_chunker.py**](./src/ingestion/text_chunker.py): Splits cleaned text into sentence-based chunks.
+### 🔀 Hybrid Retrieval
 
 ### 🛠️ Data Transformation
 - [**sentence_transformer.py**](./src.embeddings.sentence_transformer.py): Generates embeddings from sentence chunks.
@@ -23,7 +18,7 @@ The project is licensed under the **Apache License 2.0**, which permits both aca
 ### 🗄️ Data Management
 - [**vector_store.py**](./src.data.vector_store.py): Stores generated embeddings into a vector database, e.g., Milvus.
 
-## 📝 Logging
+### 📝 Logging
 
 Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
  
