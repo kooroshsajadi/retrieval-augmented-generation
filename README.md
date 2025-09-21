@@ -12,12 +12,6 @@ The project is licensed under the **Apache License 2.0**, which permits both aca
 
 ### 🔀 Hybrid Retrieval
 
-### 🛠️ Data Transformation
-- [**sentence_transformer.py**](./src.embeddings.sentence_transformer.py): Generates embeddings from sentence chunks.
-
-### 🗄️ Data Management
-- [**vector_store.py**](./src.data.vector_store.py): Stores generated embeddings into a vector database, e.g., Milvus.
-
 ### 📝 Logging
 
 Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
