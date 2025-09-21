@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from pymilvus import connections, has_collection, Collection
 from src.utils.logging_utils import setup_logger
-from scripts.main import RAGOrchestrator
+from main import RAGOrchestrator
 import yaml
 
 class TestRAGOrchestratorIntegration(unittest.TestCase):

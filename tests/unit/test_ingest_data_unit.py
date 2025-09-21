@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock, mock_open
 from pathlib import Path
 import logging
-from scripts.ingest_data import DataIngestor
+from src.ingestion.ingest_data import DataIngestor
 
 class TestDataIngestor(unittest.TestCase):
     def setUp(self):

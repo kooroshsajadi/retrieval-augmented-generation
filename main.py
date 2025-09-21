@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Dict, Any, Union
 import numpy as np
 from src.utils.logging_utils import setup_logger
-from scripts.validate_data import DataValidator
-from scripts.ingest_data import DataIngestor
+from src.validation.validate_data import DataValidator
+from src.ingestion.ingest_data import DataIngestor
 from src.embeddings.sentence_transformer import EmbeddingGenerator
 from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever

@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 import logging
-from scripts.ingest_data import DataIngestor
+from src.ingestion.ingest_data import DataIngestor
 
 class TestDataIngestorIntegration(unittest.TestCase):
     def setUp(self):

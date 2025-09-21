@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 import logging
-from scripts.validate_data import DataValidator
+from src.validation.validate_data import DataValidator
 
 class TestDataValidatorIntegration(unittest.TestCase):
     def setUp(self):
