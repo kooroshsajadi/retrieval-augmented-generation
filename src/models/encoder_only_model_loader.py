@@ -1,7 +1,7 @@
 from typing import Union
 import torch
 from transformers import AutoModel
-from utils.models.abstract_model_loader import AbstractModelLoader
+from src.utils.models.abstract_model_loader import AbstractModelLoader
 
 class EncoderOnlyModelLoader(AbstractModelLoader):
     """Model loader for encoder-only models."""

@@ -35,7 +35,7 @@ class AbstractModelLoader(ABC):
         """
         self.model_name = model_name
         self.max_length = max_length
-        self.logger = logger or setup_logger(__name__)
+        self.logger = logger or setup_logger("src.utils.models.abstract_model_loader")
 
         # Detect model config and validate against expected for this subclass
         try:
@@ -100,7 +100,7 @@ class AbstractModelLoader(ABC):
             self.tokenizer = AutoTokenizer.from_pretrained(
                 tokenizer_source,
                 padding_side='left',
-                trust_remote_code=False
+                trust_remote_code=False,
             )
             if not self.tokenizer.pad_token:
                 self.tokenizer.pad_token = self.tokenizer.eos_token or '[PAD]'

@@ -1,7 +1,7 @@
 from typing import Union
 import torch
 from transformers import AutoModelForCausalLM
-from utils.models.abstract_model_loader import AbstractModelLoader
+from src.utils.models.abstract_model_loader import AbstractModelLoader
 
 class CausalModelLoader(AbstractModelLoader):
     """Model loader for causal (decoder-only) models."""

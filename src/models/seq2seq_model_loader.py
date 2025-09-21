@@ -1,7 +1,7 @@
 from typing import Union
 import torch
 from transformers import AutoModelForSeq2SeqLM
-from utils.models.abstract_model_loader import AbstractModelLoader
+from src.utils.models.abstract_model_loader import AbstractModelLoader
 
 class Seq2SeqModelLoader(AbstractModelLoader):
     """Model loader for seq2seq models."""

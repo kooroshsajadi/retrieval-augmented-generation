@@ -1,10 +1,9 @@
 import logging
 from typing import Optional
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from src.models.model_loader import ModelLoader
 from src.utils.logging_utils import setup_logger
 import torch
 from src.utils.models.model_utils import create_and_configure_tokenizer
+from src.utils.models.model_types import MODEL_LOADER_MAPPING
 
 class LLMGenerator:
     """Generates responses using a language model for the RAG pipeline."""
@@ -37,12 +36,11 @@ class LLMGenerator:
         self.model_type = model_type
 
         try:
-            self.model_loader = ModelLoader(
+            self.model_loader = MODEL_LOADER_MAPPING[self.model_type](
                 model_name=model_path,
-                model_type=model_type,
+                device_map=self.device,
                 adapter_path=adapter_path,
                 tokenizer_path=tokenizer_path,
-                device_map=self.device,
                 max_length=self.max_length
             )
             self.model = self.model_loader.model
@@ -106,20 +104,11 @@ class LLMGenerator:
             )
 
             # Decode response, skipping the input prompt
-            print(outputs)
-            print("_"*15)
-            print(inputs["input_ids"].shape[1])
-            print("_"*15)
-            print(inputs["input_ids"].shape)
-            print("_"*15)
-            print(outputs[0].shape)
-            print("_"*15)
-            print(outputs[0][inputs["input_ids"].shape[1]:])
+            self.logger.info(f"Input IDs shape: {inputs['input_ids'].shape}")
+            self.logger.info(f'Output shape: {outputs.shape}')
+            self.logger.info(f"Response shape: {outputs[0][inputs['input_ids'].shape[1]:]}")
             response = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-            response2 = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            print(f"Response: {response}")
-            print(f"Response: {response2}")
-            self.logger.info("Generated response for query: %s...", query[:50])
+            self.logger.info("Generated response %s for query: %s...", response[:25], query[:25])
             return response.strip()
         except Exception as e:
             self.logger.error("Generation failed for query '%s': %s", query[:50], str(e))

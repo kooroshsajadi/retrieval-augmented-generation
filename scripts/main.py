@@ -7,13 +7,11 @@ import numpy as np
 from src.utils.logging_utils import setup_logger
 from scripts.validate_data import DataValidator
 from scripts.ingest_data import DataIngestor
-# from scripts.sentence_transformer import SentenceTransformerEmbedder
 from src.embeddings.sentence_transformer import EmbeddingGenerator
 from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
 from src.augmentation.augmenter import Augmenter
-from src.utils.models.cross_encoders import CrossEncoderModels
 from src.utils.models.bi_encoders import EncoderModels
 from src.utils.models.llms import LargeLanguageModels
 from src.utils.models.model_types import ModelTypes
@@ -91,7 +89,7 @@ class RAGOrchestrator:
             model_path=self.config['model'].get("model_path", LargeLanguageModels.MBART_LARGE_50.value),
             # adapter_path=self.config.get("adapter_path", None),
             tokenizer_path=self.config.get("tokenizer_path", None),
-            model_type=ModelTypes.SEQ2SEQ.value,
+            model_type=self.config['model'].get("model_type", ModelTypes.CASUAL.value),
             max_length=self.config.get("max_input_tokenization_length", 2048),
             device=self.config.get("device", "auto"),
             logger=self.logger
