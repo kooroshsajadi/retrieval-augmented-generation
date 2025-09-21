@@ -1,47 +1,52 @@
-from pathlib import Path
-from typing import Optional
+from abc import ABC, abstractmethod
+from typing import Optional, Union
 import torch
 import logging
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoConfig
 from src.utils.logging_utils import setup_logger
 from peft import PeftModel
 
-logger = setup_logger(__name__)
+class AbstractModelLoader(ABC):
+    """Abstract base class for model loaders in RAG pipeline."""
 
-class ModelLoader:
-    """Model loader for inference in RAG pipeline, optimized for seq2seq models."""
-
-    MODEL_TYPE_MAPPING = {
-        "seq2seq": AutoModelForSeq2SeqLM
-    }
+    model_type: str  # To be defined in subclasses
+    model_class: type  # To be defined in subclasses
+    expected_configs: tuple  # To be defined in subclasses
 
     def __init__(
         self,
-        model_name: str = "model/opus-mt-it-en",
-        model_type: str = "seq2seq",
+        model_name: str,
         device_map: str = "auto",
         adapter_path: Optional[str] = None,
         tokenizer_path: Optional[str] = None,
-        max_length: int = 128,
+        max_length: int = 512,
         logger: Optional[logging.Logger] = None
     ):
         """
-        Initialize ModelLoader for inference.
+        Initialize the abstract model loader for inference.
 
         Args:
             model_name (str): Path to model or Hugging Face model name.
-            model_type (str): Model type ("seq2seq").
             device_map (str): Device placement ("auto", "cpu", "xpu").
+            adapter_path (Optional[str]): Path to LoRA adapters for fine-tuning.
+            tokenizer_path (Optional[str]): Path to tokenizer, defaults to model_name.
             max_length (int): Maximum sequence length for tokenization.
             logger (logging.Logger, optional): Logger instance.
         """
         self.model_name = model_name
-        self.model_type = model_type.lower()
         self.max_length = max_length
-        self.logger = logger or setup_logger(__name__)
+        self.logger = logger or setup_logger("src.utils.models.abstract_model_loader")
 
-        if self.model_type not in self.MODEL_TYPE_MAPPING:
-            raise ValueError(f"Unsupported model_type: {self.model_type}. Choose from {list(self.MODEL_TYPE_MAPPING.keys())}")
+        # Detect model config and validate against expected for this subclass
+        try:
+            config = AutoConfig.from_pretrained(model_name, trust_remote_code=False)
+            if not isinstance(config, self.expected_configs):
+                raise ValueError(
+                    f"Model {model_name} has config {type(config).__name__}, which does not match expected configs for {self.model_type}: {self.expected_configs}."
+                )
+        except Exception as e:
+            self.logger.error(f"Failed to load config for {model_name}: {str(e)}")
+            raise
 
         # Set device
         self.use_gpu = torch.cuda.is_available() or torch.xpu.is_available()
@@ -55,8 +60,7 @@ class ModelLoader:
 
         # Load base model
         try:
-            model_class = self.MODEL_TYPE_MAPPING[self.model_type]
-            base_model = model_class.from_pretrained(
+            base_model = self.model_class.from_pretrained(
                 model_name,
                 device_map=device_map,
                 torch_dtype=self.dtype,
@@ -67,12 +71,14 @@ class ModelLoader:
             self.logger.error(f"Failed to load model {model_name}: {str(e)}")
             raise
 
+        # Load LoRA adapters if provided
         if adapter_path:
             try:
                 self.model = PeftModel.from_pretrained(base_model, adapter_path).to(self.device)
-                self.logger.info(f"Loaded base model {model_name} with adapter from{adapter_path}")
+                self.logger.info(f"Loaded base model {model_name} with adapter from {adapter_path}")
             except Exception as e:
                 self.logger.error(f"Failed to load adapter model from {adapter_path}: {str(e)}")
+                raise
         else:
             self.model = base_model
             self.logger.info(f"Loaded base model {model_name} without adapter")
@@ -88,13 +94,13 @@ class ModelLoader:
 
         self.model.eval()
 
-        # Load tokenizer from tokenizer_name if given, else from model_name
+        # Load tokenizer
         tokenizer_source = tokenizer_path if tokenizer_path is not None else model_name
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(
                 tokenizer_source,
                 padding_side='left',
-                trust_remote_code=False
+                trust_remote_code=False,
             )
             if not self.tokenizer.pad_token:
                 self.tokenizer.pad_token = self.tokenizer.eos_token or '[PAD]'
@@ -149,24 +155,16 @@ class ModelLoader:
             f"- Approx parameter memory: {mem_mb:.2f}MB ({mem_gb:.3f}GB)"
         )
 
-    def generate(self, text: str, max_new_tokens: int = 50) -> str:
-        """Generate translation or response for seq2seq model."""
-        try:
-            inputs = self.tokenizer(
-                text,
-                return_tensors="pt",
-                padding='max_length',
-                truncation=True,
-                max_length=self.max_length
-            ).to(self.device)
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=max_new_tokens,
-                    num_beams=5,
-                    early_stopping=True
-                )
-            return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        except Exception as e:
-            self.logger.error(f"Failed to generate: {str(e)}")
-            raise
+    @abstractmethod
+    def generate(self, text: str, max_new_tokens: int = 50) -> Union[str, torch.Tensor]:
+        """
+        Generate output based on the model type.
+
+        Args:
+            text (str): Input text.
+            max_new_tokens (int): Maximum new tokens for generation (if applicable).
+
+        Returns:
+            Union[str, torch.Tensor]: Generated text or embeddings.
+        """
+        pass

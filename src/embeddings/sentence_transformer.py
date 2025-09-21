@@ -1,10 +1,15 @@
 import json
-from typing import Dict, List, Any
+import logging
+import os
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from src.ingestion.text_chunker import TextChunker
+from src.utils.models.bi_encoders import EncoderModels
 import yaml
 from src.utils.logging_utils import setup_logger
+import torch
 
 class EmbeddingGenerator:
     """Generates vector embeddings for chunked text using SentenceTransformer."""
@@ -13,8 +18,11 @@ class EmbeddingGenerator:
         self,
         input_dir: str = "data/chunked_text",
         output_dir: str = "data/embeddings",
-        chunking_info_path: str = "data/metadata/chunking_prefettura_v1.2.json",
-        model_name: str = "intfloat/multilingual-e5-large",
+        max_chunk_length: int = 2000,
+        min_chunk_length: int = 10,
+        chunking_info_path: Optional[str] = None,
+        model_name: str = "dlicari/Italian-Legal-BERT-SC",
+        logger: Optional[logging.Logger] = None
     ):
         """
         Initialize EmbeddingGenerator with configuration parameters.
@@ -22,19 +30,35 @@ class EmbeddingGenerator:
         Args:
             input_dir (str): Directory containing chunked text files.
             output_dir (str): Directory to save embeddings and metadata.
+            chunking_info_path (str): Path to chunking metadata file.
             model_name (str): SentenceTransformer model name.
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
-        self.chunking_info_path = Path(chunking_info_path)
+        if chunking_info_path is not None:
+            self.chunking_info_path = Path(chunking_info_path)
         self.model_name = model_name
-        self.logger = setup_logger("sentence_transformer")
+        self.logger = logger or setup_logger("src.embeddings.sentence_transformer")
 
         # Initialize model
-        self.model = SentenceTransformer(model_name)
-        self.logger.info("Loaded SentenceTransformer model: %s", model_name)
+        try:
+            device = "xpu" if torch.xpu.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+            self.model = SentenceTransformer(model_name_or_path=model_name, device=device)
+            self.logger.info("Loaded SentenceTransformer model: %s", model_name)
+            self.logger.info("Using device: %s", device)
+        except Exception as e:
+            self.logger.error("Failed to initialize SentenceTransformer model: %s", str(e))
+            raise
 
-        # Ensure output directory exists
+        # Initialize TextChunker for file text
+        self.chunker = TextChunker(
+            max_chunk_length=max_chunk_length,
+            min_chunk_length=min_chunk_length,
+            embedder=self.model,
+            logger=self.logger
+        )
+        
+        # Ensure output directory exists.
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def load_chunk_metadata(self) -> List[Dict[str, Any]]:
@@ -44,16 +68,15 @@ class EmbeddingGenerator:
         Returns:
             List[Dict[str, Any]]: List of chunking result dictionaries.
         """
-
         if not self.chunking_info_path.exists():
-            self.logger.error("Chunking summary file not found: %s", self.chunking_info_path)
-            raise FileNotFoundError(f"Chunking summary file not found: {self.chunking_info_path}")
+            self.logger.error("Chunking metadata file not found: %s", self.chunking_info_path)
+            raise FileNotFoundError(f"Chunking metadata file not found: {self.chunking_info_path}")
 
         try:
             with open(self.chunking_info_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            self.logger.error("Failed to load chunking summary: %s", str(e))
+            self.logger.error("Failed to load chunking metadata: %s", str(e))
             raise
 
     def generate_embedding(self, text: str) -> np.ndarray:
@@ -70,14 +93,133 @@ class EmbeddingGenerator:
             embedding = self.model.encode(text, normalize_embeddings=True)
             self.logger.debug("Generated embedding for text (length: %d)", len(text))
             return embedding
-        
         except Exception as e:
             self.logger.error("Embedding generation failed: %s", str(e))
             return np.array([])
 
-    def process_file(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def process_query(self, query: str) -> Dict[str, Any]:
         """
-        Process chunks for a single file and generate embeddings.
+        Generate embedding for a user query or command.
+
+        Args:
+            query (str): User query or command text.
+
+        Returns:
+            Dict[str, Any]: Result with query, embedding, and status.
+        """
+        result = {
+            "query": query,
+            "embedding": None,
+            "is_valid": False,
+            "error": None
+        }
+
+        self.logger.info("Processing query: %s", query[:50])
+        try:
+            embedding = self.generate_embedding(query)
+            if embedding.size == 0:
+                result["error"] = "Failed to generate embedding"
+                self.logger.error(result["error"])
+                return result
+
+            result["embedding"] = embedding
+            result["is_valid"] = True
+            self.logger.info("Successfully generated embedding for query")
+            return result
+        except Exception as e:
+            result["error"] = str(e)
+            self.logger.error("Query embedding failed: %s", str(e))
+            return result
+    
+    def process_file(self, file_path: str, extracted_text: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Generate embeddings for text extracted from a file.
+
+        Args:
+            file_path (str): Path to the original file (for metadata).
+            extracted_text (str, optional): Pre-extracted text; if None, read from data/texts/.
+
+        Returns:
+            Dict[str, Any]: Result with chunks, embeddings, and metadata.
+        """
+        sample_path = Path(file_path)
+        result = {
+            "file_path": sample_path.as_posix(),
+            "file_name": sample_path.name,
+            "is_valid": False,
+            "error": None,
+            "chunk_embeddings": []
+        }
+
+        self.logger.info("Processing file: %s", file_path)
+        try:
+            # Read extracted text if not provided
+            if extracted_text is None:
+                text_file = Path("data/texts") / f"{sample_path.stem}.txt"
+                if not text_file.exists():
+                    result["error"] = f"Extracted text file not found: {text_file}"
+                    self.logger.error(result["error"])
+                    return result
+                with open(text_file, "r", encoding="utf-8") as f:
+                    extracted_text = f.read()
+
+            # Chunk the text
+            chunks = self.chunker.chunk_text(extracted_text)
+            if not chunks:
+                result["error"] = "No valid chunks generated"
+                self.logger.error(result["error"])
+                return result
+
+            # Generate embeddings for each chunk
+            for i, chunk in enumerate(chunks):
+                chunk_id = f"{sample_path.stem}_chunk_{i}"
+                embedding = self.generate_embedding(chunk["text"])
+                if embedding.size == 0:
+                    self.logger.warning("Empty embedding for chunk %s", chunk_id)
+                    continue
+
+                # Save embedding
+                embedding_file = self.output_dir / f"{chunk_id}.npy"
+                try:
+                    np.save(embedding_file, embedding)
+                    self.logger.info("Saved embedding to %s", embedding_file)
+                except Exception as e:
+                    self.logger.error("Failed to save embedding to %s: %s", embedding_file, str(e))
+                    continue
+
+                # Store metadata
+                result["chunk_embeddings"].append({
+                    "chunk_id": chunk_id,
+                    "text": chunk["text"],
+                    "embedding_file": f"{chunk_id}.npy",
+                    "is_valid": True
+                })
+
+            result["is_valid"] = len(result["chunk_embeddings"]) > 0
+            if not result["is_valid"]:
+                result["error"] = "No valid embeddings generated"
+                self.logger.warning(result["error"])
+
+            # Save metadata
+            summary_file = self.output_dir / "embeddings_summary.json"
+            existing_results = []
+            if summary_file.exists():
+                with open(summary_file, "r", encoding="utf-8") as f:
+                    existing_results = json.load(f)
+            existing_results.append(result)
+            with open(summary_file, "w", encoding="utf-8") as f:
+                json.dump(existing_results, f, ensure_ascii=False, indent=2)
+            self.logger.info("Updated embeddings summary: %s", summary_file)
+
+            return result
+        except Exception as e:
+            result["error"] = str(e)
+            self.logger.error("File embedding failed: %s", str(e))
+            return result
+
+    def process_internal_file(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process child chunks for a single file and generate embeddings.
 
         Args:
             file_metadata (Dict[str, Any]): Metadata from chunking_summary.json.
@@ -88,6 +230,7 @@ class EmbeddingGenerator:
         result = {
             "file_path": file_metadata["file_path"],
             "file_name": file_metadata["file_name"],
+            "file_id": file_metadata["file_id"],
             "is_valid": False,
             "error": None,
             "chunk_embeddings": []
@@ -96,11 +239,14 @@ class EmbeddingGenerator:
         self.logger.info("Processing file: %s", file_metadata["file_path"])
         try:
             for chunk_meta in file_metadata["chunks_metadata"]:
+                if chunk_meta["chunk_type"] != "child":
+                    self.logger.debug("Skipping non-child chunk: %s", chunk_meta["chunk_id"])
+                    continue
                 if not chunk_meta["is_valid"]:
                     self.logger.warning("Skipping invalid chunk: %s", chunk_meta["chunk_id"])
                     continue
 
-                chunk_file = self.input_dir / f"{chunk_meta['chunk_id']}.txt"
+                chunk_file = Path(chunk_meta["file_path"])
                 if not chunk_file.exists():
                     self.logger.warning("Chunk file not found: %s", chunk_file)
                     continue
@@ -113,7 +259,7 @@ class EmbeddingGenerator:
                     self.logger.warning("Empty embedding for chunk: %s", chunk_meta["chunk_id"])
                     continue
 
-                # Save embedding file
+                # Save embedding file using chunk_id
                 embedding_file = self.output_dir / f"{chunk_meta['chunk_id']}.npy"
                 try:
                     np.save(embedding_file, embedding)
@@ -122,13 +268,19 @@ class EmbeddingGenerator:
                     self.logger.error("Failed to save embedding to %s: %s", embedding_file, str(e))
                     result["error"] = str(e)
 
-                # Accumulate minimal metadata (no embedding itself)
+                # Accumulate metadata with parent information
                 result["chunk_embeddings"].append({
+                    "file_name": chunk_meta["file_name"],
+                    "file_path": chunk_meta["file_path"],
                     "chunk_id": chunk_meta["chunk_id"],
                     "word_count": chunk_meta["word_count"],
                     "char_length": chunk_meta["char_length"],
+                    "token_count": chunk_meta["token_count"],
                     "embedding_file": f"{chunk_meta['chunk_id']}.npy",
-                    "is_valid": True
+                    "is_valid": True,
+                    "parent_id": chunk_meta["parent_id"],
+                    "parent_file_name": chunk_meta["parent_file_name"],
+                    "parent_file_path": chunk_meta["parent_file_path"]
                 })
 
             result["is_valid"] = len(result["chunk_embeddings"]) > 0
@@ -168,7 +320,7 @@ class EmbeddingGenerator:
         self.logger.info("Processed %d/%d files", processed_files, len(metadata))
 
         # Save all metadata in a single summary file
-        summary_file = self.output_dir / "embeddings_summary.json"
+        summary_file = self.output_dir / "embeddings_prefettura_v1.3.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=2)
@@ -183,7 +335,7 @@ class EmbeddingGenerator:
         Returns:
             List[Dict[str, Any]]: List of embedding result dictionaries.
         """
-        summary_file = self.output_dir / "embeddings_summary.json"
+        summary_file = self.output_dir / "embeddings_prefettura_v1.3.json"
         if not summary_file.exists():
             self.logger.warning("Embeddings summary file not found: %s", summary_file)
             return []
@@ -200,10 +352,10 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks'].get('prefettura_v1.2', 'data/chunks/prefettura_v1.2_chunks'),
-            output_dir=config['embeddings'].get('prefettura_v1.2', 'data/embeddings/prefettura_v1.2_embeddings'),
-            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.2', 'data/metadata/chunking_prefettura_v1.2.json'),
-            model_name=config.get('embedding_model', 'intfloat/multilingual-e5-large')
+            input_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
+            output_dir=config['embeddings'].get('prefettura_v1.3', 'data/embeddings/prefettura_v1.3_embeddings'),
+            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3', 'data/metadata/chunking_prefettura_v1.3_chunks_parent.json'),
+            model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value
         )
         generator.process_directory()
         print("Embedding generation completed.")

@@ -1,18 +1,20 @@
 import argparse
-import logging
 import yaml
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union
+from typing import Dict, Any, Union
 import numpy as np
 from src.utils.logging_utils import setup_logger
-from scripts.validate_data import DataValidator
-from scripts.ingest_data import DataIngestor
-from scripts.sentence_transformer import SentenceTransformerEmbedder
+from src.validation.validate_data import DataValidator
+from src.ingestion.ingest_data import DataIngestor
+from src.embeddings.sentence_transformer import EmbeddingGenerator
 from src.data.vector_store import VectorStore
 from src.retrieval.retriever import MilvusRetriever
 from src.generation.generator import LLMGenerator
 from src.augmentation.augmenter import Augmenter
+from src.utils.models.bi_encoders import EncoderModels
+from src.utils.models.llms import LargeLanguageModels
+from src.utils.models.model_types import ModelTypes
 
 class RAGOrchestrator:
     """Orchestrates the RAG pipeline for processing user queries and files."""
@@ -23,15 +25,20 @@ class RAGOrchestrator:
 
         Args:
             config_path (str): Path to configuration file.
+            extended (bool): If True, include extended output with contexts.
         """
-        self.logger = setup_logger("scripts.main")
-        with open(config_path, "r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
+        self.logger = setup_logger("scripts.rag_orchestrator")
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                self.config = yaml.safe_load(f)
+        except Exception as e:
+            self.logger.error("Failed to load config %s: %s", config_path, str(e))
+            raise
         self.extended = extended
 
         # Initialize components
         self.validator = DataValidator(
-            supported_formats=self.config.get("supported_formats", [".text", ".txt", ".jpg", ".jpeg", ".gif", ".png", ".pdf"]),
+            supported_formats=self.config.get("supported_formats", [".text", ".txt", ".pdf"]),
             logger=self.logger
         )
         self.data_ingestor = DataIngestor(
@@ -40,10 +47,17 @@ class RAGOrchestrator:
             tessdata_dir=self.config.get("tessdata_dir", None),
             logger=self.logger
         )
-        self.embedder = SentenceTransformerEmbedder(
-            model_name=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
+        # self.embedder = SentenceTransformerEmbedder(
+        #     model_name=self.config.get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
+        #     output_dir=self.config["data"]["embeddings"],
+        #     max_chunk_words=self.config.get("max_chunk_words", 500),
+        #     min_chunk_length=self.config.get("min_chunk_length", 10),
+        #     logger=self.logger
+        # )
+        self.embedder = EmbeddingGenerator(
+            model_name=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             output_dir=self.config["data"]["embeddings"],
-            max_chunk_words=self.config.get("max_chunk_words", 500),
+            max_chunk_length=self.config.get("max_chunk_length", 2000),
             min_chunk_length=self.config.get("min_chunk_length", 10),
             logger=self.logger
         )
@@ -51,29 +65,32 @@ class RAGOrchestrator:
             collection_name=self.config.get("collection_name", "gotmat_collection"),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
-            embedding_dim=self.config.get("embedding_dim", 1024),
-            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.2_chunks"),
-            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.2_embeddings"),
+            embedding_dim=self.config.get("embedding_dim", 768),
+            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3_chunks"),
+            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3_embeddings"),
+            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json"),
             logger=self.logger
         )
         self.retriever = MilvusRetriever(
             collection_name=self.config.get("collection_name", "gotmat_collection"),
-            embedding_model=self.config.get("embedding_model", "intfloat/multilingual-e5-large"),
+            embedding_model=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
+            reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value),
             logger=self.logger
         )
         self.augmenter = Augmenter(
-            max_contexts=self.config.get("max_contexts", 5),
+            max_contexts=self.config.get("max_augmentation_contexts", 5),
             max_context_length=self.config.get("max_context_length", 1000),
+            max_parent_length=self.config.get("max_parent_length", 2000),
             logger=self.logger
         )
         self.generator = LLMGenerator(
-            model_path="facebook/mbart-large-50", #self.config.get("model_path", "Helsinki-NLP/opus-mt-it-en"),
-            #adapter_path=self.config.get("adapter_path", "models/fine_tuned_models/opus-mt-it-en-v1/model"),
-            #tokenizer_path=self.config.get("tokenizer_path", "models/fine_tuned_models/opus-mt-it-en-v1/tokenizer"),
-            model_type="seq2seq",
-            max_length=self.config.get("max_length", 128),
+            model_path=self.config['model'].get("model_path", LargeLanguageModels.MBART_LARGE_50.value),
+            # adapter_path=self.config.get("adapter_path", None),
+            tokenizer_path=self.config.get("tokenizer_path", None),
+            model_type=self.config['model'].get("model_type", ModelTypes.CASUAL.value),
+            max_length=self.config.get("max_input_tokenization_length", 2048),
             device=self.config.get("device", "auto"),
             logger=self.logger
         )
@@ -111,7 +128,16 @@ class RAGOrchestrator:
             chunk_texts = [c["text"] for c in embed_result["chunk_embeddings"]]
             embeddings = [np.load(Path(self.config["data"]["embeddings"]) / c["embedding_file"]) for c in embed_result["chunk_embeddings"]]
             chunk_ids = [c["chunk_id"] for c in embed_result["chunk_embeddings"]]
-            success = self.vector_store.store_vectors(chunk_texts, embeddings, chunk_ids)
+            parent_ids = [c.get("parent_id") for c in embed_result["chunk_embeddings"]]
+            parent_file_paths = [c.get("parent_file_path") for c in embed_result["chunk_embeddings"]]
+            success = self.vector_store.store_vectors(
+                texts=chunk_texts,
+                embeddings=embeddings,
+                chunk_ids=chunk_ids,
+                parent_ids=parent_ids,
+                parent_file_paths=parent_file_paths,
+                subject="courthouse"
+            )
             if not success:
                 self.logger.error("Failed to store embeddings in Milvus")
                 return False
@@ -134,12 +160,6 @@ class RAGOrchestrator:
             Dict[str, Any]: Dictionary with query, response, and contexts.
         """
         try:
-            # Generate query embedding
-            query_result = self.embedder.process_query(query)
-            if not query_result["is_valid"]:
-                self.logger.error("Query embedding failed: %s", query_result["error"])
-                return {"query": query, "response": f"Error: {query_result['error']}", "contexts": []}
-
             # Retrieve relevant chunks
             contexts = self.retriever.retrieve(query, top_k)
             self.logger.info("Retrieved %d contexts for query: %s...", len(contexts), query[:50])
@@ -148,7 +168,7 @@ class RAGOrchestrator:
             prompt = self.augmenter.augment(query, contexts)
 
             # Generate response
-            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 50))
+            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
             self.logger.info("Generated response: %s...", response[:100])
 
             return {"query": query, "response": response, "contexts": contexts}
@@ -157,10 +177,10 @@ class RAGOrchestrator:
             return {"query": query, "response": f"Error: {str(e)}", "contexts": []}
 
     def process_queries_from_file(
-        self, 
-        queries_file: Union[Path, str], 
-        output_path: Union[Path, str], 
-        top_k: int = 5, 
+        self,
+        queries_file: Union[Path, str],
+        output_path: Union[Path, str],
+        top_k: int = 5,
         extended: bool = False
     ) -> bool:
         """
@@ -202,7 +222,9 @@ class RAGOrchestrator:
                         {
                             "chunk_id": context["chunk_id"],
                             "text": context["text"],
-                            "distance": context["distance"]
+                            "score": context["score"],
+                            "parent_id": context.get("parent_id"),
+                            "parent_text": context.get("parent_text")
                         } for context in result["contexts"]
                     ]
 
@@ -217,7 +239,9 @@ class RAGOrchestrator:
                         self.logger.info("Chunk %d:", i)
                         self.logger.info("  Chunk ID: %s", context["chunk_id"])
                         self.logger.info("  Text: %s...", context["text"][:100])
-                        self.logger.info("  Distance: %.4f", context["distance"])
+                        self.logger.info("  Score: %.4f", context["score"])
+                        self.logger.info("  Parent ID: %s", context.get("parent_id", "None"))
+                        self.logger.info("  Parent Text: %s...", context.get("parent_text", "None")[:100])
                     self.logger.info("-" * 50)
 
             # Save results to JSON
@@ -234,13 +258,13 @@ class RAGOrchestrator:
 def main():
     parser = argparse.ArgumentParser(description="RAG Pipeline Orchestrator")
     parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
-    parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text, or image)")
+    parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_v1.3.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 
-    orchestrator = RAGOrchestrator(config_path=args.config)
+    orchestrator = RAGOrchestrator(config_path=args.config, extended=args.extended)
 
     # Process file if provided
     if args.file:
@@ -251,8 +275,12 @@ def main():
 
     # Process queries from file if provided
     if args.queries_file:
-        success = orchestrator.process_queries_from_file(queries_file=args.queries_file,
-                                                         output_path=args.output, extended=args.extended)
+        success = orchestrator.process_queries_from_file(
+            queries_file=args.queries_file,
+            output_path=args.output,
+            top_k=5,
+            extended=args.extended
+        )
         if success:
             print(f"Successfully processed queries from {args.queries_file} and saved to {args.output}")
         else:

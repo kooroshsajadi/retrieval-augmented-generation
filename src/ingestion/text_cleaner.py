@@ -34,8 +34,8 @@ class TextCleaner:
         # Patterns for cleaning
         self.header_footer_patterns = [
             r"Page\s+\d+\s*(of\s+\d+)?",  # e.g., "Page 1", "Page 1 of 5"
-            r"\d{1,2}/\d{1,2}/\d{2,4}",  # e.g., "12/31/2023"
-            r"\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?",  # e.g., "12:30", "12:30:45 PM"
+            # r"\d{1,2}/\d{1,2}/\d{2,4}",  # e.g., "12/31/2023"
+            # r"\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?",  # e.g., "12:30", "12:30:45 PM"
         ]
         self.special_char_pattern = r"[^\w\sàèìòùÀÈÌÒÙ.,:-;'\"“”‘’()]"
 
@@ -190,8 +190,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         cleaner = TextCleaner(
-            input_dir='data/prefettura_v1.2_texts', # Replace with your actual local address to the text files.
-            output_dir=config['cleaned_texts'].get('prefettura_v1.2', 'data/prefettura_v1.2_cleaned_texts'), # Replace with your desired local address to save the cleaned texts or change the second parameter.
+            input_dir='data/prefettura_v1.3_texts',
+            output_dir='data/prefettura_v1.3_cleaned_texts',
             min_text_length=20
         )
         cleaner.process_directory()
