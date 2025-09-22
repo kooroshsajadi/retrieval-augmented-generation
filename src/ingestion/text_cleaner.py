@@ -4,6 +4,7 @@ from typing import Dict, Any
 from pathlib import Path
 import yaml
 from src.utils.logging_utils import setup_logger
+from src.utils.deduplication_utils import fingerprint
 
 
 class TextCleaner:
@@ -108,20 +109,24 @@ class TextCleaner:
             "is_valid": False,
             "error": None,
             "original_length": 0,
-            "cleaned_length": 0
+            "cleaned_length": 0,
+            "fingerprint": ""
         }
 
         self.logger.info("Cleaning text file: %s", file_path)
         try:
-            # Read text file
+            # Read the text file
             with open(file_path, "r", encoding="utf-8") as f:
                 raw_text = f.read()
             result["original_length"] = len(raw_text)
 
-            # Clean text
+            # Clean the text
             cleaned_text = self.clean_text(raw_text)
             result["cleaned_length"] = len(cleaned_text)
             result["is_valid"] = self.is_valid_text(cleaned_text)
+
+            # Generate text fingerprint for deduplication
+            result["fingerprint"] = fingerprint(cleaned_text)
 
             if not result["is_valid"]:
                 result["error"] = "Cleaned text seems invalid (too short or lacks meaningful content)"
@@ -191,7 +196,7 @@ if __name__ == "__main__":
     try:
         cleaner = TextCleaner(
             input_dir='data/prefettura_v1.3_texts',
-            output_dir='data/prefettura_v1.3_cleaned_texts',
+            output_dir='data/prefettura_v1.3.1_cleaned_texts',
             min_text_length=20
         )
         cleaner.process_directory()
