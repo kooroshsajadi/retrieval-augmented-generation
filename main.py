@@ -47,13 +47,7 @@ class RAGOrchestrator:
             tessdata_dir=self.config.get("tessdata_dir", None),
             logger=self.logger
         )
-        # self.embedder = SentenceTransformerEmbedder(
-        #     model_name=self.config.get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
-        #     output_dir=self.config["data"]["embeddings"],
-        #     max_chunk_words=self.config.get("max_chunk_words", 500),
-        #     min_chunk_length=self.config.get("min_chunk_length", 10),
-        #     logger=self.logger
-        # )
+
         self.embedder = EmbeddingGenerator(
             model_name=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             output_dir=self.config["data"]["embeddings"],
