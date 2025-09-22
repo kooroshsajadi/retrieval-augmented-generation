@@ -104,7 +104,7 @@ class TextCleaner:
             Dict[str, Any]: Metadata about cleaning result, without cleaned text.
         """
         result = {
-            "file_path": str(file_path),
+            "file_path": Path(self.output_dir, file_path.name).as_posix(),
             "file_name": file_path.name,
             "is_valid": False,
             "error": None,
