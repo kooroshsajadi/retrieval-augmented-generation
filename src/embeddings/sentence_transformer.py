@@ -331,7 +331,7 @@ class EmbeddingGenerator:
         self.logger.info("Processed %d/%d files", processed_files, len(metadata))
 
         # Save all metadata in a single summary file
-        summary_file = self.output_dir / "embeddings_prefettura_v1.3.json"
+        summary_file = self.output_dir / "embeddings_prefettura_v1.3.1.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=2)
