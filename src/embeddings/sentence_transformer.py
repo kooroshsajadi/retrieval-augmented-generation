@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 import numpy as np
@@ -10,6 +9,7 @@ from src.utils.models.bi_encoders import EncoderModels
 import yaml
 from src.utils.logging_utils import setup_logger
 import torch
+from src.utils.ingestion.chunk_strategy import ChunkingStrategy
 
 class EmbeddingGenerator:
     """Generates vector embeddings for chunked text using SentenceTransformer."""
@@ -22,7 +22,8 @@ class EmbeddingGenerator:
         min_chunk_length: int = 10,
         chunking_info_path: Optional[str] = None,
         model_name: str = "dlicari/Italian-Legal-BERT-SC",
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
+        chunking_strategy=ChunkingStrategy.PARENT.value
     ):
         """
         Initialize EmbeddingGenerator with configuration parameters.
@@ -39,6 +40,7 @@ class EmbeddingGenerator:
             self.chunking_info_path = Path(chunking_info_path)
         self.model_name = model_name
         self.logger = logger or setup_logger("src.embeddings.sentence_transformer")
+        self.chunking_strategy = chunking_strategy
 
         # Initialize model
         try:
@@ -305,17 +307,26 @@ class EmbeddingGenerator:
             self.logger.warning("No chunking metadata found. Skipping processing.")
             return
 
-        self.logger.info("Processing %d files in %s", len(metadata), self.input_dir)
+        self.logger.info("Processing files in %s based on metadata.", self.input_dir)
         processed_files = 0
         results = []
 
-        for file_metadata in metadata:
-            if not file_metadata["is_valid"]:
-                self.logger.warning("Skipping invalid file: %s", file_metadata["file_path"])
-                continue
-            result = self.process_file(file_metadata)
-            results.append(result)
-            processed_files += 1
+        if self.chunking_strategy == ChunkingStrategy.PARENT.value:
+            for file_metadata in metadata:
+                if not file_metadata["is_valid"]:
+                    self.logger.warning("Skipping invalid file: %s", file_metadata["file_path"])
+                    continue
+                result = self.process_internal_file(file_metadata)
+                results.append(result)
+                processed_files += 1
+        else:
+            for file_metadata in metadata:
+                if not file_metadata["is_valid"]:
+                    self.logger.warning("Skipping invalid file: %s", file_metadata["file_path"])
+                    continue
+                result = self.process_file(file_metadata["file_path"])
+                results.append(result)
+                processed_files += 1
 
         self.logger.info("Processed %d/%d files", processed_files, len(metadata))
 
@@ -352,10 +363,11 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
-            output_dir=config['embeddings'].get('prefettura_v1.3', 'data/embeddings/prefettura_v1.3_embeddings'),
-            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3', 'data/metadata/chunking_prefettura_v1.3_chunks_parent.json'),
-            model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value
+            input_dir=config['chunks'].get('prefettura_v1.3.1', 'data/chunks/prefettura_v1.3.1_chunks'),
+            output_dir=config['embeddings'].get('prefettura_v1.3.1', 'data/embeddings/prefettura_v1.3.1_embeddings'),
+            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3.1', 'data/metadata/chunking_prefettura_v1.3.1_chunks_parent.json'),
+            model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
+            chunking_strategy=ChunkingStrategy.PARENT.value
         )
         generator.process_directory()
         print("Embedding generation completed.")
