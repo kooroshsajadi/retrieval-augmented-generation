@@ -11,6 +11,7 @@ from src.utils.ingestion.chunk_strategy import ChunkingStrategy
 from src.utils.ingestion.sentence_based_chunking import create_sentence_based_chunks
 from src.utils.ingestion.parent_chunking import ParentChildChunking
 from src.utils.models.bi_encoders import EncoderModels
+from src.utils.deduplication_utils import get_unique_text_files
 
 class TextChunker:
     """Splits cleaned text into chunks for downstream processing using specified chunking strategy."""
@@ -150,12 +151,12 @@ class TextChunker:
                     is_valid_chunk=self.is_valid_chunk
                 )
             else:  # parent
-                file_stem = file_path.name.rsplit(".", 1)[0]
                 parent_chunker = ParentChildChunking(
                     text_dir=str(self.input_dir),
                     max_tokens=self.max_tokens,
                     max_chunk_length=self.max_chunk_length
                 )
+                file_stem = file_path.name.rsplit(".", 1)[0]
                 chunks = parent_chunker.chunk(
                     file_path=str(file_path),
                     count_tokens=self.count_tokens,
@@ -201,7 +202,8 @@ class TextChunker:
         """
         Process all text files in the input directory and save accumulated metadata once.
         """
-        text_files = list(self.input_dir.glob("*.txt"))
+        # text_files = list(self.input_dir.glob("*.txt"))
+        text_files = get_unique_text_files(self.input_dir)
         if not text_files:
             self.logger.warning("No text files found in %s", self.input_dir)
             return
@@ -271,8 +273,8 @@ if __name__ == "__main__":
     try:
         embedder = SentenceTransformer(EncoderModels.ITALIAN_LEGAL_BERT_SC.value)
         chunker = TextChunker(
-            input_dir=config['cleaned_texts'].get('prefettura_v1.3', 'data/prefettura_v1.3_cleaned_texts'),
-            output_dir=config['chunks'].get('prefettura_v1.3', 'data/chunks/prefettura_v1.3_chunks'),
+            input_dir=config['cleaned_texts'].get('prefettura_v1.3.1', 'data/prefettura_v1.3.1_cleaned_texts'),
+            output_dir=config['chunks'].get('prefettura_v1.3.1', 'data/chunks/prefettura_v1.3.1_chunks'),
             max_chunk_length=2000,
             min_chunk_length=10,
             max_tokens=768,
