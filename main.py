@@ -47,13 +47,7 @@ class RAGOrchestrator:
             tessdata_dir=self.config.get("tessdata_dir", None),
             logger=self.logger
         )
-        # self.embedder = SentenceTransformerEmbedder(
-        #     model_name=self.config.get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
-        #     output_dir=self.config["data"]["embeddings"],
-        #     max_chunk_words=self.config.get("max_chunk_words", 500),
-        #     min_chunk_length=self.config.get("min_chunk_length", 10),
-        #     logger=self.logger
-        # )
+
         self.embedder = EmbeddingGenerator(
             model_name=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             output_dir=self.config["data"]["embeddings"],
@@ -61,6 +55,7 @@ class RAGOrchestrator:
             min_chunk_length=self.config.get("min_chunk_length", 10),
             logger=self.logger
         )
+
         self.vector_store = VectorStore(
             collection_name=self.config.get("collection_name", "gotmat_collection"),
             milvus_host=self.config.get("milvus_host", "localhost"),
@@ -71,6 +66,7 @@ class RAGOrchestrator:
             metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json"),
             logger=self.logger
         )
+
         self.retriever = MilvusRetriever(
             collection_name=self.config.get("collection_name", "gotmat_collection"),
             embedding_model=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
@@ -79,12 +75,14 @@ class RAGOrchestrator:
             reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value),
             logger=self.logger
         )
+
         self.augmenter = Augmenter(
             max_contexts=self.config.get("max_augmentation_contexts", 5),
             max_context_length=self.config.get("max_context_length", 1000),
             max_parent_length=self.config.get("max_parent_length", 2000),
             logger=self.logger
         )
+        
         self.generator = LLMGenerator(
             model_path=self.config['model'].get("model_path", LargeLanguageModels.MBART_LARGE_50.value),
             # adapter_path=self.config.get("adapter_path", None),
