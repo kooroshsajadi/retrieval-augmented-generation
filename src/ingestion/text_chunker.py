@@ -259,7 +259,7 @@ class TextChunker:
             processed_files += 1
 
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
-        summary_file = f"data/metadata/chunking_prefettura_v1.3_chunks_{self.chunking_strategy}.json"
+        summary_file = f"data/metadata/chunking_prefettura_v1.3.1_chunks_{self.chunking_strategy}.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
