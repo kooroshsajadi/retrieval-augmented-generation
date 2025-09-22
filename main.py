@@ -41,6 +41,7 @@ class RAGOrchestrator:
             supported_formats=self.config.get("supported_formats", [".text", ".txt", ".pdf"]),
             logger=self.logger
         )
+
         self.data_ingestor = DataIngestor(
             output_dir=self.config["data"]["texts"],
             language="ita",
@@ -55,6 +56,7 @@ class RAGOrchestrator:
             min_chunk_length=self.config.get("min_chunk_length", 10),
             logger=self.logger
         )
+
         self.vector_store = VectorStore(
             collection_name=self.config.get("collection_name", "gotmat_collection"),
             milvus_host=self.config.get("milvus_host", "localhost"),
@@ -65,6 +67,7 @@ class RAGOrchestrator:
             metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json"),
             logger=self.logger
         )
+
         self.retriever = MilvusRetriever(
             collection_name=self.config.get("collection_name", "gotmat_collection"),
             embedding_model=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
@@ -73,12 +76,14 @@ class RAGOrchestrator:
             reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value),
             logger=self.logger
         )
+
         self.augmenter = Augmenter(
             max_contexts=self.config.get("max_augmentation_contexts", 5),
             max_context_length=self.config.get("max_context_length", 1000),
             max_parent_length=self.config.get("max_parent_length", 2000),
             logger=self.logger
         )
+
         self.generator = LLMGenerator(
             model_path=self.config['model'].get("model_path", LargeLanguageModels.MBART_LARGE_50.value),
             # adapter_path=self.config.get("adapter_path", None),
@@ -165,10 +170,10 @@ class RAGOrchestrator:
             response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
             self.logger.info("Generated response: %s...", response[:100])
 
-            return {"query": query, "response": response, "contexts": contexts}
+            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt}
         except Exception as e:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
-            return {"query": query, "response": f"Error: {str(e)}", "contexts": []}
+            return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": ""}
 
     def process_queries_from_file(
         self,
@@ -200,6 +205,7 @@ class RAGOrchestrator:
                 queries_data = json.load(f)
 
             results = []
+            prompts = []
             for item in queries_data:
                 if "Italian" not in item:
                     self.logger.warning("Skipping item without 'Italian' field: %s", item)
@@ -223,6 +229,7 @@ class RAGOrchestrator:
                     ]
 
                 results.append(output_item)
+                prompts.append(result["prompt"])
 
                 # Print extended output to console if requested
                 if extended:
@@ -238,11 +245,13 @@ class RAGOrchestrator:
                         self.logger.info("  Parent Text: %s...", context.get("parent_text", "None")[:100])
                     self.logger.info("-" * 50)
 
-            # Save results to JSON
+            # Save results to JSON TODO: Add to a function
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=2)
+            with open('data/results/prompts_v1.3.json', "w", encoding="utf-8") as f:
+                json.dump(prompts, f, ensure_ascii=False, indent=2)
             self.logger.info("Saved query responses to %s", output_path)
             return True
         except Exception as e:

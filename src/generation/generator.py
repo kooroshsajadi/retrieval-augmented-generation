@@ -106,7 +106,6 @@ class LLMGenerator:
             # Decode response, skipping the input prompt
             self.logger.info(f"Input IDs shape: {inputs['input_ids'].shape}")
             self.logger.info(f'Output shape: {outputs.shape}')
-            self.logger.info(f"Response shape: {outputs[0][inputs['input_ids'].shape[1]:]}")
             response = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
             self.logger.info("Generated response %s for query: %s...", response[:25], query[:25])
             return response.strip()
