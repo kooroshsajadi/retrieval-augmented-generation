@@ -19,9 +19,9 @@ class VectorStore:
         milvus_host: str = "localhost",
         milvus_port: str = "19530",
         embedding_dim: int = 768,  # Matches dlicari/Italian-Legal-BERT-SC
-        chunks_dir: str = "data/chunks/prefettura_v1.3_chunks",
-        embeddings_dir: str = "data/embeddings/prefettura_v1.3_embeddings",
-        metadata_path: str = "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json",
+        chunks_dir: str = "data/chunks/prefettura_v1.3.1_chunks",
+        embeddings_dir: str = "data/embeddings/prefettura_v1.3.1_embeddings",
+        metadata_path: str = "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json",
         metadata: Optional[List[dict]] = None,
         logger: Optional[logging.Logger] = None
     ):

@@ -127,8 +127,8 @@ class TextExtractor:
 if __name__ == "__main__":
     extractor = TextExtractor(
         input_dir=Path("data/prefettura_v1_files"),
-        output_dir=Path("data/prefettura_v1.3_texts"),
-        output_metadata_file=Path("data/metadata/extraction_prefettura_v1.3.json"),
+        output_dir=Path("data/prefettura.1_texts"),
+        output_metadata_file=Path("data/metadata/extraction_prefettura_v1.3.1.json"),
         language='ita'
     )
     extractor.process_directory()
