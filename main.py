@@ -1,4 +1,5 @@
 import argparse
+import torch
 import yaml
 import json
 from pathlib import Path
@@ -41,6 +42,7 @@ class RAGOrchestrator:
             supported_formats=self.config.get("supported_formats", [".text", ".txt", ".pdf"]),
             logger=self.logger
         )
+
         self.data_ingestor = DataIngestor(
             output_dir=self.config["data"]["texts"],
             language="ita",
@@ -61,9 +63,9 @@ class RAGOrchestrator:
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
             embedding_dim=self.config.get("embedding_dim", 768),
-            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3_chunks"),
-            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3_embeddings"),
-            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json"),
+            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3.1_chunks"),
+            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3.1_embeddings"),
+            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json"),
             logger=self.logger
         )
 
@@ -169,10 +171,10 @@ class RAGOrchestrator:
             response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
             self.logger.info("Generated response: %s...", response[:100])
 
-            return {"query": query, "response": response, "contexts": contexts}
+            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt}
         except Exception as e:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
-            return {"query": query, "response": f"Error: {str(e)}", "contexts": []}
+            return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": ""}
 
     def process_queries_from_file(
         self,
@@ -204,6 +206,7 @@ class RAGOrchestrator:
                 queries_data = json.load(f)
 
             results = []
+            prompts = []
             for item in queries_data:
                 if "Italian" not in item:
                     self.logger.warning("Skipping item without 'Italian' field: %s", item)
@@ -227,6 +230,7 @@ class RAGOrchestrator:
                     ]
 
                 results.append(output_item)
+                prompts.append(result["prompt"])
 
                 # Print extended output to console if requested
                 if extended:
@@ -242,11 +246,13 @@ class RAGOrchestrator:
                         self.logger.info("  Parent Text: %s...", context.get("parent_text", "None")[:100])
                     self.logger.info("-" * 50)
 
-            # Save results to JSON
+            # Save results to JSON TODO: Add to a function
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=2)
+            with open('data/results/prompts_v1.3.1.json', "w", encoding="utf-8") as f:
+                json.dump(prompts, f, ensure_ascii=False, indent=2)
             self.logger.info("Saved query responses to %s", output_path)
             return True
         except Exception as e:
@@ -258,7 +264,7 @@ def main():
     parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses_v1.3.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_v1.3.1.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 

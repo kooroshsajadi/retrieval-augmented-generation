@@ -77,65 +77,66 @@ class MilvusConnector:
     def get_all_texts(self) -> Tuple[List[str], List[str], List[str], List[str]]:
         """
         Retrieve all texts, chunk IDs, parent IDs, and parent file paths from the Milvus collection.
-
-        Returns:
-            Tuple[List[str], List[str], List[str], List[str]]: Lists of texts, chunk_ids, parent_ids, and parent_file_paths.
-
-        Raises:
-            MilvusException: If the query fails after retries.
+    
+        Returns
+        -------
+        Tuple[List[str], List[str], List[str], List[str]]
+            Lists of texts, chunk_ids, parent_ids, and parent_file_paths.
+    
+        Raises
+        ------
+        MilvusException
+            If the query fails after all retries or the Milvus server returns an error.
+    
+        Notes
+        -----
+        This function paginates queries with strict adherence to Milvus's
+        max query result window: (offset + limit) <= 16384 per query.
+        Empty texts are skipped by default. Retries with exponential backoff are included.
         """
-        try:
-            texts = []
-            chunk_ids = []
-            parent_ids = []
-            parent_file_paths = []
-            offset = 0
-            limit = 1000  # Fetch in batches to handle large collections
-            retries = 3
-
-            while True:
-                for attempt in range(retries):
-                    try:
-                        # Query all entities with pagination
-                        result = self.collection.query(
-                            expr="",  # Empty expression to fetch all
-                            offset=offset,
-                            limit=limit,
-                            output_fields=["chunk_id", "text", "parent_id", "parent_file_path"]
-                        )
-                        # Extract texts, chunk_ids, parent_ids, and parent_file_paths
-                        for hit in result:
-                            chunk_id = hit.get("chunk_id")
-                            text = hit.get("text", "")
-                            parent_id = hit.get("parent_id", "")
-                            parent_file_path = hit.get("parent_file_path", "")
-                            if text.strip():  # Skip empty texts
-                                texts.append(text)
-                                chunk_ids.append(chunk_id)
-                                parent_ids.append(parent_id)
-                                parent_file_paths.append(parent_file_path)
-                            else:
-                                self.logger.warning(f"Skipping empty text for chunk_id: {chunk_id}")
-
-                        offset += limit
-                        if len(result) < limit:  # No more data to fetch
-                            break
-                        break  # Exit retry loop on success
-                    except MilvusException as e:
-                        self.logger.error(f"Attempt {attempt + 1} to fetch texts failed: {str(e)}")
-                        if attempt < retries - 1:
-                            time.sleep(5)  # Wait before retry
+        
+        texts, chunk_ids, parent_ids, parent_file_paths = [], [], [], []
+        offset = 0
+        base_limit = 1000  # Adjustable batch size, must be << 16384
+        max_window = 16384    # Milvus max query window
+        retries = 3
+        while True:
+             # Compute the largest possible limit for this batch that does not exceed max_window
+            limit = min(base_limit, max_window - offset)
+            if limit <= 0:
+                break  # Prevents overrun of max_window
+            for attempt in range(retries):
+                try:
+                    # Query all entities with pagination
+                    result = self.collection.query(
+                        expr="",  # Empty expression to fetch all
+                        offset=offset,
+                        limit=limit,
+                        output_fields=["chunk_id", "text", "parent_id", "parent_file_path"]
+                    )
+                    # Extract and append the batch results.
+                    for hit in result:
+                        text = hit.get("text", "")
+                        if not text:
+                            self.logger.warning(f"Skipping entry with empty text for chunk_id: {hit.get('chunk_id')}")
                             continue
+                        texts.append(text)
+                        chunk_ids.append(hit.get("chunk_id", ""))
+                        parent_ids.append(hit.get("parent_id", ""))
+                        parent_file_paths.append(hit.get("parent_file_path", ""))
+                    break  # Success: exit retry loop
+                except MilvusException as e:
+                    self.logger.error(f"Attempt {attempt + 1} to fetch texts failed: {str(e)}")
+                    if attempt < retries - 1:
+                        time.sleep(5 * (attempt + 1))  # Exponential backoff.
+                        continue # Retry next attempt
+                    else:
                         raise
-                    except Exception as e:
-                        self.logger.error(f"Unexpected error fetching texts: {str(e)}")
-                        raise
-
-                if len(result) < limit:
-                    break
-
-            self.logger.info(f"Retrieved {len(texts)} texts, chunk_ids, parent_ids, and parent_file_paths from collection {self.collection_name}")
-            return texts, chunk_ids, parent_ids, parent_file_paths
-        except Exception as e:
-            self.logger.error(f"Failed to retrieve texts: {str(e)}")
-            raise
+                except Exception as e:
+                    self.logger.error(f"Unexpected error fetching texts: {str(e)}")
+                    raise
+            offset += limit
+            if len(result) < limit:
+                break # No more data to fetch
+        self.logger.info(f"Retrieved {len(texts)} texts from collection {self.collection.name}")
+        return texts, chunk_ids, parent_ids, parent_file_paths

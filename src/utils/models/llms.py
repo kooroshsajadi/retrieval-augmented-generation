@@ -26,3 +26,26 @@ class LargeLanguageModels(Enum):
 
     # GPT-2 Distil: ~82M parameters, distilled version of GPT-2 for efficient text generation.
     OPENAI_GPT2_DISTIL = "distilbert/distilgpt2"
+
+    # Mistral 7B: Highly efficient causal transformer, open-source, great for limited GPU memory (~7B parameters)
+    MISTRAL_7B = "mistralai/mistral-7b"
+    
+    # Qwen 7B: Strong performance in causal generation, lighter than Llama 3 8B
+    QWEN_7B = "Qwen/Qwen-7B"
+    
+    # Falcon 7B: Popular open-source causal model with 7B params, efficient and effective
+    FALCON_7B = "tiiuae/falcon-7b"
+    
+    # Guanaco 7B: Instruction tuned causal model, good for causal generation and fine-tuning
+    GUANACO_7B = "yahma/guanaco-7b"
+    
+    # Orca Mini 7B: Lightweight causal transformer, known for instruction following
+    ORCA_MINI_7B = "kakaobrain/orca_mini_v2_7b"
+
+    # For somewhat larger but still smaller than 8B models (if available GPU memory allows):
+    
+    # Mistral Mixtral 8x7B: Sparse mixture of experts architecture, improves efficiency
+    MIXTRAL_8X7B = "mistralai/mixtral-8x7b"
+    
+    # Gemma 4B: Smaller causal model with good reasoning for constrained resources
+    GEMMA_4B = "gemma/gemma-4b"

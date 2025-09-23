@@ -10,6 +10,10 @@ The project is licensed under the **Apache License 2.0**, which permits both aca
 
 ## 🧱 Components
 
+### ♻️ Deduplication
+
+This component handles duplicate text detection to ensure storage efficiency and avoid redundant data in the vector database. The current implementation uses a signature-based deduplication strategy.
+
 ### 🔀 Hybrid Retrieval
 
 ### 📝 Logging

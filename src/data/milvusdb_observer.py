@@ -1,7 +1,14 @@
-from pymilvus import connections, utility, Collection
+from pymilvus import connections, utility
 
+# Connect to Milvus
 connections.connect(alias="default", host="localhost", port="19530")
-print("Collections:", utility.list_collections())
 
-collection = Collection("gotmat_collection")
-print("Number of entities in collection:", collection.num_entities)
+# List collections before deletion
+print("Collections before removal:", utility.list_collections())
+
+# Drop the collection
+# utility.drop_collection("test_gotmat_collection")
+# print("Dropped collection: test_gotmat_collection")
+
+# List collections after deletion to confirm removal
+print("Collections after removal:", utility.list_collections())
