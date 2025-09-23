@@ -43,7 +43,7 @@ class HybridRetriever:
             self.logger.error(f"Failed to initialize BM25 index: {str(e)}")
             raise
 
-    def retrieve_hybrid(self, query: str, top_k: int, vector_weight: float = 0.5) -> List[Dict[str, Any]]:
+    def retrieve_hybrid(self, query: str, top_k: int, vector_weight: float = 0.7) -> List[Dict[str, Any]]:
         """
         Perform hybrid retrieval combining vector and BM25 search.
 

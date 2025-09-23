@@ -6,7 +6,7 @@ import json
 import argparse
 from pymilvus import (
     connections, has_collection,
-    FieldSchema, CollectionSchema, DataType, Collection, utility
+    FieldSchema, CollectionSchema, DataType, Collection
 )
 from src.utils.logging_utils import setup_logger
 
@@ -22,7 +22,6 @@ class VectorStore:
         chunks_dir: str = "data/chunks/prefettura_v1.3.1_chunks",
         embeddings_dir: str = "data/embeddings/prefettura_v1.3.1_embeddings",
         metadata_path: str = "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json",
-        metadata: Optional[List[dict]] = None,
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -323,7 +322,7 @@ if __name__ == "__main__":
     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
     parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")
-    parser.add_argument("--chunks_dir", type=str, default="data/chunks/prefettura_v1.3_chunks", help="Directory containing chunked text files")
+    parser.add_argument("--chunks_dir", type=str, default="data/chunks/prefettura_v1.3.1_chunks", help="Directory containing chunked text files")
     parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/prefettura_v1.3.1_embeddings", help="Directory containing embedding files")
     parser.add_argument("--metadata_path", type=str, default="data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json", help="Embedding metadata file")
     args = parser.parse_args()

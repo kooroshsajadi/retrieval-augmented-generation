@@ -3,7 +3,7 @@ data:
   texts: data/texts
   cleaned_texts: data/cleaned_texts
   chunks: data/chunks/prefettura_v1.3.1_chunks
-  embeddings_metadata: data/embeddings/prefettura_v1.3.1_embeddings
+  embeddings_metadata: data/embeddings/main/embeddings_main.json
   destination: data/results
   embeddings: data/embeddings/main
 model:

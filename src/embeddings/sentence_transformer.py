@@ -23,7 +23,8 @@ class EmbeddingGenerator:
         chunking_info_path: Optional[str] = None,
         model_name: str = "dlicari/Italian-Legal-BERT-SC",
         logger: Optional[logging.Logger] = None,
-        chunking_strategy=ChunkingStrategy.PARENT.value
+        chunking_strategy=ChunkingStrategy.PARENT.value,
+        metadata_path: Optional[str] = "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json",
     ):
         """
         Initialize EmbeddingGenerator with configuration parameters.
@@ -41,6 +42,7 @@ class EmbeddingGenerator:
         self.model_name = model_name
         self.logger = logger or setup_logger("src.embeddings.sentence_transformer")
         self.chunking_strategy = chunking_strategy
+        self.metadata_path = Path(metadata_path) if metadata_path else self.output_dir / "embeddings_summary.json"
 
         # Initialize model
         try:
@@ -331,7 +333,7 @@ class EmbeddingGenerator:
         self.logger.info("Processed %d/%d files", processed_files, len(metadata))
 
         # Save all metadata in a single summary file
-        summary_file = self.output_dir / "embeddings_prefettura_v1.3.1.json"
+        summary_file = str(self.metadata_path)
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=2)
@@ -346,7 +348,7 @@ class EmbeddingGenerator:
         Returns:
             List[Dict[str, Any]]: List of embedding result dictionaries.
         """
-        summary_file = self.output_dir / "embeddings_prefettura_v1.3.json"
+        summary_file = self.metadata_path
         if not summary_file.exists():
             self.logger.warning("Embeddings summary file not found: %s", summary_file)
             return []
