@@ -1,4 +1,5 @@
 import argparse
+import torch
 import yaml
 import json
 from pathlib import Path
@@ -62,9 +63,9 @@ class RAGOrchestrator:
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
             embedding_dim=self.config.get("embedding_dim", 768),
-            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3_chunks"),
-            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3_embeddings"),
-            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3_embeddings/embeddings_prefettura_v1.3.json"),
+            chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3.1_chunks"),
+            embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3.1_embeddings"),
+            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json"),
             logger=self.logger
         )
 
@@ -250,7 +251,7 @@ class RAGOrchestrator:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(results, f, ensure_ascii=False, indent=2)
-            with open('data/results/prompts_v1.3.json', "w", encoding="utf-8") as f:
+            with open('data/results/prompts_v1.3.1.json', "w", encoding="utf-8") as f:
                 json.dump(prompts, f, ensure_ascii=False, indent=2)
             self.logger.info("Saved query responses to %s", output_path)
             return True
@@ -263,7 +264,7 @@ def main():
     parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses_v1.3.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_v1.3.1.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 
