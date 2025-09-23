@@ -13,14 +13,6 @@ model:
   adapter_path: #models/fine_tuned_models/opus-mt-it-en-v1/model
   tokenizer_path: #"dlicari/Italian-Legal-BERT-SC" #"meta-llama/Meta-Llama-3-8B-Instruct" #facebook/mbart-large-50   #models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
   embedding_model: dlicari/distil-ita-legal-bert #"dlicari/Italian-Legal-BERT-SC" #"dlicari/Italian-Legal-BERT"  #intfloat/multilingual-e5-large-instruct 
-supported_formats:
-  - .text
-  - .txt
-  - .jpg
-  - .jpeg
-  - .gif
-  - .png
-  - .pdf
 embedding_dim: 768
 collection_name: gotmat_collection
 milvus_host: localhost
@@ -35,3 +27,11 @@ max_augmentation_contexts: 5
 max_context_length: 1000
 max_parent_length: 2000
 tessdata_dir: C:/Program Files/Tesseract-OCR/tessdata
+supported_formats:
+  - .text
+  - .txt
+  - .jpg
+  - .jpeg
+  - .gif
+  - .png
+  - .pdf
