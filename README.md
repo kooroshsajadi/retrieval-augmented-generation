@@ -16,12 +16,6 @@ This component handles duplicate text detection to ensure storage efficiency and
 
 ### 🔀 Hybrid Retrieval
 
-### 🛠️ Data Transformation
-- [**sentence_transformer.py**](./src.embeddings.sentence_transformer.py): Generates embeddings from sentence chunks.
-
-### 🗄️ Data Management
-- [**vector_store.py**](./src.data.vector_store.py): Stores generated embeddings into a vector database, e.g., Milvus.
-
 ### 📝 Logging
 
 Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
