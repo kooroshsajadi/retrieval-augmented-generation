@@ -16,9 +16,11 @@ def get_unique_text_files(input_dir):
     Returns:
         List[Path]: List of unique text file paths (no duplicates by fingerprint).
     """
-    summary_path = input_dir / 'cleaning_summary.json'
+
+    cleaning_summary_file_name = 'cleaning_leggi_area_3.json'
+    summary_path = input_dir / cleaning_summary_file_name
     if not summary_path.exists():
-        raise FileNotFoundError(f"cleaning_summary.json does not exist in {input_dir}")
+        raise FileNotFoundError(f"{cleaning_summary_file_name} does not exist in {input_dir}")
 
     with open(summary_path, 'r', encoding='utf-8') as f:
         summary = json.load(f)
