@@ -322,9 +322,9 @@ if __name__ == "__main__":
     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
     parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")
-    parser.add_argument("--chunks_dir", type=str, default="data/chunks/prefettura_v1.3.1_chunks", help="Directory containing chunked text files")
-    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/prefettura_v1.3.1_embeddings", help="Directory containing embedding files")
-    parser.add_argument("--metadata_path", type=str, default="data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json", help="Embedding metadata file")
+    parser.add_argument("--chunks_dir", type=str, default="data/chunks/leggi_area_3_chunks", help="Directory containing chunked text files")
+    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/leggi_area_3_embeddings", help="Directory containing embedding files")
+    parser.add_argument("--metadata_path", type=str, default="data/metadata/embeddings_leggi_area_3.json", help="Embedding metadata file")
     args = parser.parse_args()
 
     logger = setup_logger("src.data.vector_store")
