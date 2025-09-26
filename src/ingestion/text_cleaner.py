@@ -195,8 +195,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         cleaner = TextCleaner(
-            input_dir='data/prefettura_v1.3_texts',
-            output_dir='data/prefettura_v1.3.1_cleaned_texts',
+            input_dir='data/leggi_area_3_text',
+            output_dir='data/leggi_area_3_cleaned_texts',
             min_text_length=20
         )
         cleaner.process_directory()
