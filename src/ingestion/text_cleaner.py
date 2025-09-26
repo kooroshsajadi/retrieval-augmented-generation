@@ -86,7 +86,7 @@ class TextCleaner:
             return False
 
         # Check for Italian diacritics or legal terms
-        if re.search(r'[sàèìòùÀÈÌÒÙ]', text, re.IGNORECASE): #or re.search(r'\b(legge|decreto|articolo)\b', text, re.IGNORECASE):
+        if re.search(r'[àèìòùÀÈÌÒÙ]', text, re.IGNORECASE): #or re.search(r'\b(legge|decreto|articolo)\b', text, re.IGNORECASE):
             return True
 
         # Fallback: At least 5 words
