@@ -233,20 +233,20 @@ class VectorStore:
         except Exception as e:
             self.logger.error("Failed to store vectors: %s", str(e))
             return False
-        
-    def bulk_insert(self, texts_dir: Optional[str] = None) -> bool:
+
+    def bulk_insert(self, force_recreate: bool = False) -> bool:
         """
         Perform bulk insertion of all chunk texts and embeddings using metadata.
 
         Args:
-            texts_dir (Optional[str]): Directory containing original text files, defaults to None.
+            force_recreate: bool: If True, drop and recreate the collection; default to False.
 
         Returns:
             bool: True if bulk insertion succeeds, False otherwise.
         """
         try:
             # Initialize collection
-            self.collection = self._create_collection(force_recreate=False)
+            self.collection = self._create_collection(force_recreate=force_recreate)
 
             # Load embedding metadata
             metadata = self._load_embedding_metadata()
@@ -344,7 +344,7 @@ if __name__ == "__main__":
         logger=logger
     )
 
-    success = vector_store.bulk_insert()
+    success = vector_store.bulk_insert(force_recreate=False)
     if success:
         logger.info("Bulk insertion completed successfully")
     else:
