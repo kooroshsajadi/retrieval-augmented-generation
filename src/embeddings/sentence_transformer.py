@@ -24,7 +24,7 @@ class EmbeddingGenerator:
         model_name: str = "dlicari/Italian-Legal-BERT-SC",
         logger: Optional[logging.Logger] = None,
         chunking_strategy=ChunkingStrategy.PARENT.value,
-        metadata_path: Optional[str] = "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json",
+        metadata_path: Optional[str] = "data/metadata/embeddings_leggi_area_3.json",
     ):
         """
         Initialize EmbeddingGenerator with configuration parameters.
@@ -368,6 +368,7 @@ if __name__ == "__main__":
             input_dir=config['chunks'].get('leggi_area_3', 'data/chunks/leggi_area_3_chunks'),
             output_dir=config['embeddings'].get('leggi_area_3', 'data/embeddings/leggi_area_3_embeddings'),
             chunking_info_path=config['metadata'].get('leggi_area_3', 'data/metadata/leggi_area_3_chunks_parent.json'),
+            metadata_path="data/metadata/embeddings_leggi_area_3.json",
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
             chunking_strategy=ChunkingStrategy.PARENT.value
         )
