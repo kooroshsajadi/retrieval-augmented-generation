@@ -365,9 +365,9 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks'].get('prefettura_v1.3.1', 'data/chunks/prefettura_v1.3.1_chunks'),
-            output_dir=config['embeddings'].get('prefettura_v1.3.1', 'data/embeddings/prefettura_v1.3.1_embeddings'),
-            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3.1', 'data/metadata/chunking_prefettura_v1.3.1_chunks_parent.json'),
+            input_dir=config['chunks'].get('leggi_area_3', 'data/chunks/leggi_area_3_chunks'),
+            output_dir=config['embeddings'].get('leggi_area_3', 'data/embeddings/leggi_area_3_embeddings'),
+            chunking_info_path=config['metadata'].get('leggi_area_3', 'data/metadata/leggi_area_3_chunks_parent.json'),
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
             chunking_strategy=ChunkingStrategy.PARENT.value
         )

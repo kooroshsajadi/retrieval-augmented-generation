@@ -198,12 +198,14 @@ class TextChunker:
             except Exception as e:
                 self.logger.error("Failed to save chunk to %s: %s", chunk_file_path, str(e))
 
-    def process_directory(self) -> None:
+    def process_directory(self, cleaning_summary_path: Path) -> None:
         """
         Process all text files in the input directory and save accumulated metadata once.
+
+        Parameters:
+            cleaning_summary_path (Path): Path to the cleaning summary JSON file.
         """
-        # text_files = list(self.input_dir.glob("*.txt"))
-        text_files = get_unique_text_files(self.input_dir)
+        text_files = get_unique_text_files(self.input_dir, cleaning_summary_path)
         if not text_files:
             self.logger.warning("No text files found in %s", self.input_dir)
             return
@@ -281,7 +283,7 @@ if __name__ == "__main__":
             chunking_strategy=config.get('chunking_strategy', ChunkingStrategy.PARENT.value),
             embedder=embedder
         )
-        chunker.process_directory()
+        chunker.process_directory(cleaning_summary_path=Path('data/metadata/cleaning_leggi_area_3.json'))
         print("Text chunking completed.")
     except Exception as e:
         print(f"Error during text chunking: {e}")
