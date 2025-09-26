@@ -259,7 +259,7 @@ class TextChunker:
             processed_files += 1
 
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
-        summary_file = f"data/metadata/chunking_prefettura_v1.3.1_chunks_{self.chunking_strategy}.json"
+        summary_file = f"data/metadata/leggi_area_3_chunks_{self.chunking_strategy}.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
@@ -273,8 +273,8 @@ if __name__ == "__main__":
     try:
         embedder = SentenceTransformer(EncoderModels.ITALIAN_LEGAL_BERT_SC.value)
         chunker = TextChunker(
-            input_dir=config['cleaned_texts'].get('prefettura_v1.3.1', 'data/prefettura_v1.3.1_cleaned_texts'),
-            output_dir=config['chunks'].get('prefettura_v1.3.1', 'data/chunks/prefettura_v1.3.1_chunks'),
+            input_dir=config['cleaned_texts'].get('leggi_area_3', 'data/leggi_area_3_cleaned_texts'),
+            output_dir=config['chunks'].get('leggi_area_3', 'data/chunks/leggi_area_3_chunks'),
             max_chunk_length=2000,
             min_chunk_length=10,
             max_tokens=768,
