@@ -221,7 +221,7 @@ class EmbeddingGenerator:
             self.logger.error("File embedding failed: %s", str(e))
             return result
 
-    def process_internal_file(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def process_parent_child_chunks(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process child chunks for a single file and generate embeddings.
 
@@ -318,7 +318,7 @@ class EmbeddingGenerator:
                 if not file_metadata["is_valid"]:
                     self.logger.warning("Skipping invalid file: %s", file_metadata["file_path"])
                     continue
-                result = self.process_internal_file(file_metadata)
+                result = self.process_parent_child_chunks(file_metadata)
                 results.append(result)
                 processed_files += 1
         else:
@@ -367,7 +367,7 @@ if __name__ == "__main__":
         generator = EmbeddingGenerator(
             input_dir=config['chunks'].get('leggi_area_3', 'data/chunks/leggi_area_3_chunks'),
             output_dir=config['embeddings'].get('leggi_area_3', 'data/embeddings/leggi_area_3_embeddings'),
-            chunking_info_path=config['metadata'].get('leggi_area_3', 'data/metadata/leggi_area_3_chunks_parent.json'),
+            chunking_info_path=config['metadata'].get('leggi_area_3', 'data/metadata/chunking_leggi_area_3_chunks_parent.json'),
             metadata_path="data/metadata/embeddings_leggi_area_3.json",
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
             chunking_strategy=ChunkingStrategy.PARENT.value
