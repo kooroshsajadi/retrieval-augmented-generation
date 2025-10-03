@@ -8,11 +8,11 @@ data:
   embeddings: data/embeddings/main
 model:
   model_type: causal
-  reranker_model: dlicari/distil-ita-legal-bert #"dlicari/Italian-Legal-BERT"
-  model_path: "distilbert/distilgpt2" #"tiiuae/falcon-7b" #meta-llama/Meta-Llama-3-8B-Instruct #"openai-community/gpt2-large" #"dlicari/Italian-Legal-BERT-SC" #facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
-  adapter_path: models/fine_tuned_models/distilgpt2/model #models/fine_tuned_models/opus-mt-it-en-v1/model
-  tokenizer_path: models/fine_tuned_models/distilgpt2/tokenizer #"dlicari/Italian-Legal-BERT-SC" #"meta-llama/Meta-Llama-3-8B-Instruct" #facebook/mbart-large-50 #models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
-  embedding_model: dlicari/distil-ita-legal-bert #"dlicari/Italian-Legal-BERT-SC" #"dlicari/Italian-Legal-BERT"  #intfloat/multilingual-e5-large-instruct 
+  reranker_model: "dlicari/Italian-Legal-BERT" #dlicari/distil-ita-legal-bert 
+  model_path: "tiiuae/falcon-7b" #"gemma/gemma-4b" #"TheBloke/Llama-2-7B-GPTQ" #"tiiuae/falcon-7b" #"distilbert/distilgpt2"  #meta-llama/Meta-Llama-3-8B-Instruct #"openai-community/gpt2-large" #"dlicari/Italian-Legal-BERT-SC" #facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
+  adapter_path: #models/fine_tuned_models/distilgpt2/model #models/fine_tuned_models/opus-mt-it-en-v1/model
+  tokenizer_path: "dlicari/Italian-Legal-BERT-SC" #models/fine_tuned_models/distilgpt2/tokenizer #"meta-llama/Meta-Llama-3-8B-Instruct" #facebook/mbart-large-50 #models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
+  embedding_model: "dlicari/Italian-Legal-BERT-SC" #dlicari/distil-ita-legal-bert #"dlicari/Italian-Legal-BERT"  #intfloat/multilingual-e5-large-instruct 
 embedding_dim: 768
 collection_name: gotmat_collection
 milvus_host: localhost
