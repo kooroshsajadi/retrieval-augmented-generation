@@ -5,5 +5,6 @@ logs
 config.yaml
 volumes
 docker*
+!docker-compose.yml
 /models
 .vs
