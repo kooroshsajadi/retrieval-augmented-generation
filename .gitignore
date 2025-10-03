@@ -8,3 +8,4 @@ docker*
 !docker-compose.yml
 /models
 .vs
+.venv
