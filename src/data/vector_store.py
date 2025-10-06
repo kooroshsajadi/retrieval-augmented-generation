@@ -51,7 +51,7 @@ class VectorStore:
         for dir_path in [self.chunks_dir, self.embeddings_dir]:
             if not dir_path.exists():
                 self.logger.error("Directory not found: %s", dir_path)
-                raise FileNotFoundError(f"Directory not found: {dir_path}")
+                # raise FileNotFoundError(f"Directory not found: {dir_path}")
 
         # Connect to Milvus
         try:
@@ -316,36 +316,36 @@ class VectorStore:
             self.logger.error("Bulk insertion failed: %s", str(e))
             return False
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Bulk insert data into Milvus collection")
-    parser.add_argument("--collection_name", type=str, default="gotmat_collection", help="Milvus collection name")
-    parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
-    parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
-    parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")
-    parser.add_argument("--chunks_dir", type=str, default="data/chunks/leggi_area_3_chunks", help="Directory containing chunked text files")
-    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/leggi_area_3_embeddings", help="Directory containing embedding files")
-    parser.add_argument("--metadata_path", type=str, default="data/metadata/embeddings_leggi_area_3.json", help="Embedding metadata file")
-    args = parser.parse_args()
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser(description="Bulk insert data into Milvus collection")
+#     parser.add_argument("--collection_name", type=str, default="gotmat_collection", help="Milvus collection name")
+#     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
+#     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
+#     parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")
+#     parser.add_argument("--chunks_dir", type=str, default="data/chunks/leggi_area_3_chunks", help="Directory containing chunked text files")
+#     parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/leggi_area_3_embeddings", help="Directory containing embedding files")
+#     parser.add_argument("--metadata_path", type=str, default="data/metadata/embeddings_leggi_area_3.json", help="Embedding metadata file")
+#     args = parser.parse_args()
 
-    logger = setup_logger("src.data.vector_store")
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    logger.addHandler(handler)
+#     logger = setup_logger("src.data.vector_store")
+#     logger.setLevel(logging.INFO)
+#     handler = logging.StreamHandler()
+#     handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+#     logger.addHandler(handler)
 
-    vector_store = VectorStore(
-        collection_name=args.collection_name,
-        milvus_host=args.milvus_host,
-        milvus_port=args.milvus_port,
-        embedding_dim=args.embedding_dim,
-        chunks_dir=args.chunks_dir,
-        embeddings_dir=args.embeddings_dir,
-        metadata_path=args.metadata_path,
-        logger=logger
-    )
+#     vector_store = VectorStore(
+#         collection_name=args.collection_name,
+#         milvus_host=args.milvus_host,
+#         milvus_port=args.milvus_port,
+#         embedding_dim=args.embedding_dim,
+#         chunks_dir=args.chunks_dir,
+#         embeddings_dir=args.embeddings_dir,
+#         metadata_path=args.metadata_path,
+#         logger=logger
+#     )
 
-    success = vector_store.bulk_insert(force_recreate=False)
-    if success:
-        logger.info("Bulk insertion completed successfully")
-    else:
-        logger.error("Bulk insertion failed")
+#     success = vector_store.bulk_insert(force_recreate=True)
+#     if success:
+#         logger.info("Bulk insertion completed successfully")
+#     else:
+#         logger.error("Bulk insertion failed")
