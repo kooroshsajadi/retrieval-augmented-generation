@@ -218,22 +218,11 @@ class VectorStore:
 
             self.collection.flush()
             self.logger.info("Successfully stored %d vectors in Milvus", total)
-
-            # Update metadata
-            for chunk_id, parent_id, parent_file_path in zip(chunk_ids, parent_ids, parent_file_paths):
-                self.metadata.append({
-                    "chunk_id": chunk_id,
-                    "parent_id": parent_id,
-                    "parent_file_path": str(parent_file_path)
-                })
-            with open(self.metadata_path, "w", encoding="utf-8") as f:
-                json.dump(self.metadata, f, ensure_ascii=False, indent=2)
-            self.logger.info("Updated metadata at %s", self.metadata_path)
             return True
         except Exception as e:
             self.logger.error("Failed to store vectors: %s", str(e))
             return False
-
+    
     def bulk_insert(self, force_recreate: bool = False) -> bool:
         """
         Perform bulk insertion of all chunk texts and embeddings using metadata.
