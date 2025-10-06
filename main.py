@@ -213,12 +213,12 @@ class RAGOrchestrator:
                     continue
                 query = item["Italian"]
                 result = self.process_query(query, top_k)
-                # Include contexts in output JSON if extended is True
                 output_item = {
                     "query": query,
                     "answer": result["response"]
                 }
-                if extended:
+                if extended: # Include prompt and contexts in output JSON if extended is True
+                    output_item["prompt"] = result["prompt"]
                     output_item["contexts"] = [
                         {
                             "chunk_id": context["chunk_id"],
