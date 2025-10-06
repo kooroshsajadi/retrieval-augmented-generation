@@ -240,7 +240,7 @@ class EmbeddingGenerator:
             "chunk_embeddings": []
         }
 
-        self.logger.info("Processing file: %s", file_metadata["file_path"])
+        self.logger.info("Processing file: %s", Path(file_metadata["file_path"]))
         try:
             for chunk_meta in file_metadata["chunks_metadata"]:
                 if chunk_meta["chunk_type"] != "child":
@@ -361,13 +361,13 @@ class EmbeddingGenerator:
             return []
 
 if __name__ == "__main__":
-    with open('src/configs/config.yaml') as file:
-        config = yaml.safe_load(file)
+    # with open('src/configs/config.yaml') as file:
+    #     config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks'].get('leggi_area_3', 'data/chunks/leggi_area_3_chunks'),
-            output_dir=config['embeddings'].get('leggi_area_3', 'data/embeddings/leggi_area_3_embeddings'),
-            chunking_info_path=config['metadata'].get('leggi_area_3', 'data/metadata/chunking_leggi_area_3_chunks_parent.json'),
+            input_dir='data/chunks/leggi_area_3_chunks',
+            output_dir='data/embeddings/leggi_area_3_embeddings',
+            chunking_info_path='data/metadata/chunking_leggi_area_3_chunks_parent.json',
             metadata_path="data/metadata/embeddings_leggi_area_3.json",
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
             chunking_strategy=ChunkingStrategy.PARENT.value
