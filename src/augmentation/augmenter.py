@@ -59,6 +59,70 @@ class Augmenter:
     def augment(self, query: str, contexts: List[Dict[str, Any]]) -> str:
         """
         Augment the query with retrieved child and parent contexts for the language model.
+        [Docstring unchanged...]
+        """
+        try:
+            if not query or not isinstance(query, str):
+                self.logger.error("Invalid query: %s", query)
+                return f"Query: {query}\nContext: None"
+
+            # Filter and select top contexts (unchanged)
+            valid_contexts = [
+                c for c in contexts
+                if isinstance(c, dict) and "text" in c and c["text"].strip() and isinstance(c["text"], str)
+                and "parent_file_path" in c and isinstance(c["parent_file_path"], str)
+            ]
+            if not valid_contexts:
+                self.logger.warning("No valid contexts provided for query: %s", query[:50])
+                return f"Query: {query}\nContext: None"
+
+            sorted_contexts = sorted(valid_contexts, key=lambda x: x.get("score", 0.0), reverse=True)
+            selected_contexts = sorted_contexts[:self.max_contexts]
+
+            # New: Instructional preamble (customize as needed; Italian version below if queries are in IT)
+            preamble = """Rispondi alla seguente query in italiano, basandoti principalmente sui contesti rilevanti forniti di seguito (estratti da documenti legali). 
+    Usa la tua conoscenza generale per colmare lacune, ma cita sezioni specifiche dove possibile per garantire accuratezza. 
+    Struttura la risposta in modo chiaro e conciso, indicando le fonti tra parentesi (es. [Contesto 1]).
+
+    Query: {query}
+
+    Contesti rilevanti:""".format(query=query)
+
+            # Build context sections
+            context_parts = []
+            for i, context in enumerate(selected_contexts, 1):
+                # Truncate child text (unchanged)
+                child_text = context["text"][:self.max_context_length]
+                if len(context["text"]) > self.max_context_length:
+                    child_text += "..."
+
+                # Load parent text (unchanged)
+                parent_text = self._load_parent_text(context["parent_file_path"]) if context.get("parent_file_path") else ""
+
+                # Metadata tag (compact)
+                subject = context.get("subject", "tribunale")
+                chunk_id = context.get("chunk_id", "sconosciuto")
+                score = context.get("score", 0.0)
+                metadata_tag = f"[Soggetto: {subject}, ID Chunk: {chunk_id}, Punteggio: {score:.3f}]"
+
+                # Combined excerpt: Child as "focus," parent as "contesto ampliato" for natural flow
+                excerpt = f"{i}. {metadata_tag}\nEstratto principale: {child_text}\nContesto ampliato: {parent_text[:self.max_parent_length] or 'Non disponibile'}..." if len(parent_text) > self.max_parent_length else parent_text or 'Non disponibile'
+
+                context_parts.append(excerpt)
+
+            # Assemble full prompt
+            prompt = preamble + "\n\n".join(context_parts) + "\n\nRispondi ora alla query."
+
+            self.logger.info("Augmented query with %d contexts for query: %s...", len(selected_contexts), query[:50])
+            return prompt
+
+        except Exception as e:
+            self.logger.error("Augmentation failed for query '%s': %s", query[:50], str(e))
+            return f"Query: {query}\nContext: None"
+
+    def augment_old(self, query: str, contexts: List[Dict[str, Any]]) -> str:
+        """
+        Augment the query with retrieved child and parent contexts for the language model.
 
         Args:
             query (str): User query (e.g., in Italian for legal documents).
