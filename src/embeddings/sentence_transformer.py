@@ -367,7 +367,7 @@ if __name__ == "__main__":
         generator = EmbeddingGenerator(
             input_dir='data/chunks/leggi_area_3_chunks',
             output_dir='data/embeddings/leggi_area_3_embeddings',
-            chunking_info_path='data/metadata/chunking_leggi_area_3_chunks_parent.json',
+            chunking_info_path='data/metadata/chunking_leggi_area_3_chunks_parent_linux.json',
             metadata_path="data/metadata/embeddings_leggi_area_3.json",
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
             chunking_strategy=ChunkingStrategy.PARENT.value
