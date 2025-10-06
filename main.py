@@ -82,7 +82,7 @@ class RAGOrchestrator:
             max_contexts=self.config.get("max_augmentation_contexts", 5),
             max_context_length=self.config.get("max_context_length", 1000),
             max_parent_length=self.config.get("max_parent_length", 2000),
-            logger=self.logger
+            # logger=self.logger
         )
         
         self.generator = LLMGenerator(
