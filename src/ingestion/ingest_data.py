@@ -35,7 +35,7 @@ class DataIngestor:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.max_pages = max_pages
         self.language = language
-        self.logger = logger or setup_logger("data_ingestor")
+        self.logger = logger or setup_logger("src.ingestion.data_ingestor")
         if tessdata_dir:
             self.tessdata_dir = tessdata_dir
             os.environ["TESSDATA_PREFIX"] = self.tessdata_dir

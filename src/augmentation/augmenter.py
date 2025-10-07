@@ -25,7 +25,7 @@ class Augmenter:
         self.max_contexts = max_contexts
         self.max_context_length = max_context_length
         self.max_parent_length = max_parent_length
-        self.logger = logger or setup_logger("augmenter")
+        self.logger = logger or setup_logger("src.augmentation.augmenter")
         self.logger.info(
             "Initialized Augmenter with max_contexts=%d, max_context_length=%d, max_parent_length=%d",
             max_contexts, max_context_length, max_parent_length

@@ -39,23 +39,20 @@ class RAGOrchestrator:
 
         # Initialize components
         self.validator = DataValidator(
-            supported_formats=self.config.get("supported_formats", [".text", ".txt", ".pdf"]),
-            logger=self.logger
+            supported_formats=self.config.get("supported_formats", [".text", ".txt", ".pdf"])
         )
 
         self.data_ingestor = DataIngestor(
             output_dir=self.config["data"]["texts"],
             language="ita",
-            tessdata_dir=self.config.get("tessdata_dir", None),
-            logger=self.logger
+            tessdata_dir=self.config.get("tessdata_dir", None)
         )
 
         self.embedder = EmbeddingGenerator(
             model_name=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             output_dir=self.config["data"]["embeddings"],
             max_chunk_length=self.config.get("max_chunk_length", 2000),
-            min_chunk_length=self.config.get("min_chunk_length", 10),
-            logger=self.logger
+            min_chunk_length=self.config.get("min_chunk_length", 10)
         )
 
         self.vector_store = VectorStore(
@@ -65,8 +62,7 @@ class RAGOrchestrator:
             embedding_dim=self.config.get("embedding_dim", 768),
             chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3.1_chunks"),
             embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3.1_embeddings"),
-            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json"),
-            logger=self.logger
+            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json")
         )
 
         self.retriever = MilvusRetriever(
@@ -74,15 +70,13 @@ class RAGOrchestrator:
             embedding_model=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
-            reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value),
-            logger=self.logger
+            reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value)
         )
 
         self.augmenter = Augmenter(
             max_contexts=self.config.get("max_augmentation_contexts", 5),
             max_context_length=self.config.get("max_context_length", 1000),
-            max_parent_length=self.config.get("max_parent_length", 2000),
-            # logger=self.logger
+            max_parent_length=self.config.get("max_parent_length", 2000)
         )
         
         self.generator = LLMGenerator(
@@ -91,8 +85,7 @@ class RAGOrchestrator:
             tokenizer_path=self.config['model'].get("tokenizer_path", None),
             model_type=self.config['model'].get("model_type", ModelTypes.CASUAL.value),
             max_length=self.config.get("max_input_tokenization_length", 2048),
-            device=self.config.get("device", "auto"),
-            logger=self.logger
+            device=self.config.get("device", "auto")
         )
 
     def process_file(self, file_path: str) -> bool:
