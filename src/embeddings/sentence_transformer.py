@@ -83,6 +83,68 @@ class EmbeddingGenerator:
             self.logger.error("Failed to load chunking metadata: %s", str(e))
             raise
 
+    def generate_embedding_with_fallback(self, text: str) -> np.ndarray:
+        """
+        Generate embedding for a single text chunk with OOM fallback.
+    
+        Args:
+            text (str): Text chunk to embed.
+    
+        Returns:
+            np.ndarray: Embedding vector, or empty array on failure.
+        """
+        if not text or not isinstance(text, str):
+            self.logger.warning("Empty or invalid text provided for embedding")
+            return np.array([])
+    
+        try:
+            # Initial attempt on current device (GPU/XPU)
+            embedding = self.model.encode(
+                text, 
+                normalize_embeddings=True,
+                max_length=512,  # Cap to reduce memory footprint
+                truncate=True
+            )
+            # Clear cache to prevent accumulation
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            elif torch.xpu.is_available():
+                torch.xpu.empty_cache()
+            self.logger.debug("Generated embedding for text (length: %d) on %s", len(text), self.model.device)
+            return embedding
+    
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower() or "UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY" in str(e):
+                self.logger.warning("GPU OOM on text (len: %d). Retrying on CPU...", len(text))
+                try:
+                    # Fallback: Temporarily move model to CPU and encode
+                    original_device = self.model.device
+                    self.model = self.model.to("cpu")  # Move to CPU
+                    embedding = self.model.encode(
+                        text, 
+                        normalize_embeddings=True,
+                        max_length=512,
+                        truncate=True
+                    )
+                    # Move back to original device
+                    self.model = self.model.to(original_device)
+                    # Clear CPU cache (less critical but good practice)
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    elif torch.xpu.is_available():
+                        torch.xpu.empty_cache()
+                    self.logger.info("Fallback to CPU succeeded for text (len: %d)", len(text))
+                    return embedding
+                except Exception as cpu_e:
+                    self.logger.error("CPU fallback failed: %s", str(cpu_e))
+                    return np.array([])
+            else:
+                # Non-OOM error: re-raise
+                raise
+        except Exception as e:
+            self.logger.error("Embedding generation failed: %s", str(e))
+            return np.array([])
+    
     def generate_embedding(self, text: str) -> np.ndarray:
         """
         Generate embedding for a single text chunk.

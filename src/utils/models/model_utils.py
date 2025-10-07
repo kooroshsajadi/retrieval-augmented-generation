@@ -39,3 +39,45 @@ def create_and_configure_tokenizer(
         return tokenizer
     except Exception:
         raise
+
+def configure_data_type(device: str) -> Optional[str]:
+    """
+    Determines the appropriate floating-point data type for the given device.
+
+    Parameters
+    ----------
+    device : str
+        The target device identifier. Expected values are:
+        - 'cpu': Central Processing Unit
+        - 'cuda': NVIDIA GPU (CUDA-enabled)
+        - 'xpu': Intel or other accelerators supporting bfloat16
+
+    Returns
+    -------
+    Optional[str]
+        The selected data type as a string:
+        - 'float32' for 'cpu'
+        - 'float16' for 'cuda'
+        - 'bfloat16' for 'xpu'
+        - None if the device is unrecognized.
+
+    Examples
+    --------
+    >>> configure_data_type('cpu')
+    'float32'
+    >>> configure_data_type('cuda')
+    'float16'
+    >>> configure_data_type('xpu')
+    'bfloat16'
+    >>> configure_data_type('unknown')
+    None
+    """
+    device_lower = device.lower()
+    if device_lower == 'cpu':
+        return 'float32'
+    elif device_lower == 'cuda':
+        return 'float16'
+    elif device_lower == 'xpu':
+        return 'bfloat16'
+    else:
+        return None
