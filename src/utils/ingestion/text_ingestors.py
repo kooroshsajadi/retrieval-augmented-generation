@@ -43,7 +43,13 @@ def extract_text_with_ocr(file_path: Path, language: str = 'ita') -> Tuple[str, 
     """
     text, page_metadata = "", []
     try:
-        images = convert_from_path(pdf_path=file_path, dpi=300, first_page=1, use_pdftocairo=True)
+        # Convert PDF pages to images using pdf2image.
+        images = convert_from_path(pdf_path=file_path
+                                   , dpi=300
+                                   , first_page=1
+                                   , use_pdftocairo=True
+                                   , grayscale=True)
+        
         for i, image in enumerate(images):
             image = ImageEnhance.Contrast(image).enhance(2.0)
             page_text = pytesseract.image_to_string(image, lang=language) or ""
