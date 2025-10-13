@@ -49,7 +49,7 @@ class LLMGenerator:
             self.model = self.model_loader.model
             tokenizer_source = tokenizer_path if tokenizer_path is not None else model_path
             self.tokenizer = create_and_configure_tokenizer(model=self.model, model_name=model_path, tokenizer_path=tokenizer_source)
-            self.logger.info("Loaded model %s and tokenizer %s on %s", model_path, tokenizer_source, self.device)
+            self.logger.info("Loaded model %s with repetition_penalty %s and tokenizer %s on %s", model_path, self.repetition_penalty, tokenizer_source, self.device)
         except Exception as e:
             self.logger.error("Failed to load model or tokenizer: %s", str(e))
             raise
