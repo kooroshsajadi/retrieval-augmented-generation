@@ -85,7 +85,8 @@ class RAGOrchestrator:
             tokenizer_path=self.config['model'].get("tokenizer_path", None),
             model_type=self.config['model'].get("model_type", ModelTypes.CASUAL.value),
             max_length=self.config.get("max_input_tokenization_length", 2048),
-            device=self.config.get("device", "auto")
+            device=self.config.get("device", "auto"),
+            repetition_penalty=self.config.get("repetition_penalty", 1.0)
         )
 
     def process_file(self, file_path: str) -> bool:
