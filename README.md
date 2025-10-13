@@ -10,11 +10,15 @@ The project is licensed under the **Apache License 2.0**, which permits both aca
 
 ## 🧱 Components
 
+### 🔗 Parent-Child Chunking
+This component implements hierarchical parent-child chunking using `LangChain`'s `RecursiveCharacterTextSplitter` to divide documents into larger parent chunks for broader context and smaller child chunks for precise semantic retrieval and embedding. It generates unique MD5-hashed IDs for chunks, computes metadata including word/char/token counts and validity checks, and links children to parents for efficient storage in Milvus, enabling retrieval of fine-grained matches while accessing full contextual parents during generation. This strategy optimizes RAG for legal texts by preserving structural coherence and reducing information loss in long documents.
+
 ### ♻️ Deduplication
 
 This component handles duplicate text detection to ensure storage efficiency and avoid redundant data in the vector database. The current implementation uses a signature-based deduplication strategy.
 
 ### 🧬 Embedding
+
 This component generates dense vector embeddings for chunked texts using the `SentenceTransformer` library with a sekected model such as `dlicari/Italian-Legal-BERT-SC`. It supports parent-child chunking strategies for hierarchical retrieval, processes directories or individual files with configurable max/min chunk lengths, and saves normalized, truncated embeddings while handling metadata like word counts and parent IDs. Optimized for hardware accelerators (prioritizing XPU or GPU with CPU fallback), the module includes comprehensive logging for device usage, embedding generation, and error recovery to ensure robust, modular operation in RAG pipelines.
 
 ### 🔀 Hybrid Retrieval
