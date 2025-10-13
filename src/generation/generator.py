@@ -99,10 +99,10 @@ class LLMGenerator:
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
-                do_sample=True,
-                temperature=0.7,
+                do_sample=True, # Optional: Enable sampling for more diversity
+                temperature=0.7, # Optional: Adjust for creativity (lower = more deterministic)
                 repetition_penalty=self.repetition_penalty,
-                top_p=0.9,
+                top_p=0.9, # Optional: Nucleus sampling (combine with repetition_penalty)
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
