@@ -258,7 +258,7 @@ def main():
     parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses_(leggi_area3)(reranking_bm25_deduplication)(repetition_penalty_sampling_temprature_topp)_falcon7binstruct_extended.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_(leggi_area3)(reranking_bm25_deduplication)(repetition_penalty_sampling_temperature_topp)_falcon7binstruct_finetuned_extended.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 
