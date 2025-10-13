@@ -18,7 +18,7 @@ This component handles duplicate text detection to ensure storage efficiency and
 
 ### 📝 Logging
 
-Proper code is embedded in each script and execution logs for each is saved to `logs/` for debugging.
+Logging is embedded in each module using Python's built-in logging library, with loggers named by module to enable granular control and avoid root logger conflicts. Messages are categorized by levels (DEBUG for diagnostics, INFO for workflow tracking, WARNING/ERROR for issues) and output to console for real-time monitoring while persisting to timestamped files in `logs/` for auditing and debugging in the RAG pipeline.
  
 ## 🚀 How to Run the Project
 
