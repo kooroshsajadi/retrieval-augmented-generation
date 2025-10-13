@@ -18,6 +18,10 @@ This component handles duplicate text detection to ensure storage efficiency and
 
 This component implements hybrid retrieval by combining BM25 sparse retrieval for keyword matching with dense vector similarity search using Milvus embeddings to capture semantic relevance in texts. Retrieved candidates from both methods are fused using a weighted score.
 
+### 🎯 Reranker
+
+This component refines fused candidates from hybrid retrieval using a cross-encoder model, such as `dlicari/Italian-Legal-BERT`, which jointly embeds query and chunk pairs to compute nuanced relevance scores beyond initial similarity metrics.
+
 ### 📝 Logging
 
 Logging is embedded in each module using Python's built-in logging library, with loggers named by module to enable granular control and avoid root logger conflicts. Messages are categorized by levels (DEBUG for diagnostics, INFO for workflow tracking, WARNING/ERROR for issues) and output to console for real-time monitoring while persisting to timestamped files in `logs/` for auditing and debugging in the RAG pipeline.
