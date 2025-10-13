@@ -28,7 +28,7 @@ class RAGOrchestrator:
             config_path (str): Path to configuration file.
             extended (bool): If True, include extended output with contexts.
         """
-        self.logger = setup_logger("scripts.rag_orchestrator")
+        self.logger = setup_logger("main")
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 self.config = yaml.safe_load(f)
