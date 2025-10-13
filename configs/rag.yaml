@@ -20,6 +20,7 @@ milvus_port: 19530
 max_input_tokenization_length: 512
 max_new_tokens: 800
 device: auto
+repetition_penalty: 1.1
 max_chunk_words: 500
 max_chunk_length: 2000
 min_chunk_length: 10
