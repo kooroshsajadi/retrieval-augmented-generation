@@ -59,7 +59,14 @@ class Augmenter:
     def augment(self, query: str, contexts: List[Dict[str, Any]]) -> str:
         """
         Augment the query with retrieved child and parent contexts for the language model.
-        [Docstring unchanged...]
+
+        Args:
+            query (str): User query (e.g., in Italian for legal documents).
+            contexts (List[Dict[str, Any]]): Retrieved chunks with keys 'chunk_id', 'text', 'score',
+                                            'parent_id', 'parent_file_path', and optional 'subject'.
+
+        Returns:
+            str: Formatted prompt combining query, child contexts, and parent contexts, or query alone if no valid contexts.
         """
         try:
             if not query or not isinstance(query, str):
