@@ -198,12 +198,14 @@ class TextChunker:
             except Exception as e:
                 self.logger.error("Failed to save chunk to %s: %s", chunk_file_path, str(e))
 
-    def process_directory(self) -> None:
+    def process_directory(self, cleaning_summary_path: Path) -> None:
         """
         Process all text files in the input directory and save accumulated metadata once.
+
+        Parameters:
+            cleaning_summary_path (Path): Path to the cleaning summary JSON file.
         """
-        # text_files = list(self.input_dir.glob("*.txt"))
-        text_files = get_unique_text_files(self.input_dir)
+        text_files = get_unique_text_files(self.input_dir, cleaning_summary_path)
         if not text_files:
             self.logger.warning("No text files found in %s", self.input_dir)
             return
@@ -259,7 +261,7 @@ class TextChunker:
             processed_files += 1
 
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
-        summary_file = f"data/metadata/chunking_prefettura_v1.3.1_chunks_{self.chunking_strategy}.json"
+        summary_file = f"data/metadata/leggi_area_3_chunks_{self.chunking_strategy}.json"
         try:
             with open(summary_file, "w", encoding="utf-8") as f:
                 json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
@@ -273,15 +275,15 @@ if __name__ == "__main__":
     try:
         embedder = SentenceTransformer(EncoderModels.ITALIAN_LEGAL_BERT_SC.value)
         chunker = TextChunker(
-            input_dir=config['cleaned_texts'].get('prefettura_v1.3.1', 'data/prefettura_v1.3.1_cleaned_texts'),
-            output_dir=config['chunks'].get('prefettura_v1.3.1', 'data/chunks/prefettura_v1.3.1_chunks'),
+            input_dir=config['cleaned_texts'].get('leggi_area_3', 'data/leggi_area_3_cleaned_texts'),
+            output_dir=config['chunks'].get('leggi_area_3', 'data/chunks/leggi_area_3_chunks'),
             max_chunk_length=2000,
             min_chunk_length=10,
             max_tokens=768,
             chunking_strategy=config.get('chunking_strategy', ChunkingStrategy.PARENT.value),
             embedder=embedder
         )
-        chunker.process_directory()
+        chunker.process_directory(cleaning_summary_path=Path('data/metadata/cleaning_leggi_area_3.json'))
         print("Text chunking completed.")
     except Exception as e:
         print(f"Error during text chunking: {e}")

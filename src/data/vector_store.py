@@ -51,7 +51,7 @@ class VectorStore:
         for dir_path in [self.chunks_dir, self.embeddings_dir]:
             if not dir_path.exists():
                 self.logger.error("Directory not found: %s", dir_path)
-                raise FileNotFoundError(f"Directory not found: {dir_path}")
+                # raise FileNotFoundError(f"Directory not found: {dir_path}")
 
         # Connect to Milvus
         try:
@@ -218,35 +218,24 @@ class VectorStore:
 
             self.collection.flush()
             self.logger.info("Successfully stored %d vectors in Milvus", total)
-
-            # Update metadata
-            for chunk_id, parent_id, parent_file_path in zip(chunk_ids, parent_ids, parent_file_paths):
-                self.metadata.append({
-                    "chunk_id": chunk_id,
-                    "parent_id": parent_id,
-                    "parent_file_path": str(parent_file_path)
-                })
-            with open(self.metadata_path, "w", encoding="utf-8") as f:
-                json.dump(self.metadata, f, ensure_ascii=False, indent=2)
-            self.logger.info("Updated metadata at %s", self.metadata_path)
             return True
         except Exception as e:
             self.logger.error("Failed to store vectors: %s", str(e))
             return False
-        
-    def bulk_insert(self, texts_dir: Optional[str] = None) -> bool:
+    
+    def bulk_insert(self, force_recreate: bool = False) -> bool:
         """
         Perform bulk insertion of all chunk texts and embeddings using metadata.
 
         Args:
-            texts_dir (Optional[str]): Directory containing original text files, defaults to None.
+            force_recreate: bool: If True, drop and recreate the collection; default to False.
 
         Returns:
             bool: True if bulk insertion succeeds, False otherwise.
         """
         try:
             # Initialize collection
-            self.collection = self._create_collection(force_recreate=False)
+            self.collection = self._create_collection(force_recreate=force_recreate)
 
             # Load embedding metadata
             metadata = self._load_embedding_metadata()
@@ -322,9 +311,9 @@ if __name__ == "__main__":
     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
     parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")
-    parser.add_argument("--chunks_dir", type=str, default="data/chunks/prefettura_v1.3.1_chunks", help="Directory containing chunked text files")
-    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/prefettura_v1.3.1_embeddings", help="Directory containing embedding files")
-    parser.add_argument("--metadata_path", type=str, default="data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json", help="Embedding metadata file")
+    parser.add_argument("--chunks_dir", type=str, default="data/chunks/leggi_area_3_chunks", help="Directory containing chunked text files")
+    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/leggi_area_3_embeddings", help="Directory containing embedding files")
+    parser.add_argument("--metadata_path", type=str, default="data/metadata/embeddings_leggi_area_3.json", help="Embedding metadata file")
     args = parser.parse_args()
 
     logger = setup_logger("src.data.vector_store")
@@ -344,7 +333,7 @@ if __name__ == "__main__":
         logger=logger
     )
 
-    success = vector_store.bulk_insert()
+    success = vector_store.bulk_insert(force_recreate=True)
     if success:
         logger.info("Bulk insertion completed successfully")
     else:

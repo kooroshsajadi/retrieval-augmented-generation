@@ -28,7 +28,7 @@ class RAGOrchestrator:
             config_path (str): Path to configuration file.
             extended (bool): If True, include extended output with contexts.
         """
-        self.logger = setup_logger("scripts.rag_orchestrator")
+        self.logger = setup_logger("main")
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 self.config = yaml.safe_load(f)
@@ -39,23 +39,20 @@ class RAGOrchestrator:
 
         # Initialize components
         self.validator = DataValidator(
-            supported_formats=self.config.get("supported_formats", [".text", ".txt", ".pdf"]),
-            logger=self.logger
+            supported_formats=self.config.get("supported_formats", [".text", ".txt", ".pdf"])
         )
 
         self.data_ingestor = DataIngestor(
             output_dir=self.config["data"]["texts"],
             language="ita",
-            tessdata_dir=self.config.get("tessdata_dir", None),
-            logger=self.logger
+            tessdata_dir=self.config.get("tessdata_dir", None)
         )
 
         self.embedder = EmbeddingGenerator(
             model_name=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             output_dir=self.config["data"]["embeddings"],
             max_chunk_length=self.config.get("max_chunk_length", 2000),
-            min_chunk_length=self.config.get("min_chunk_length", 10),
-            logger=self.logger
+            min_chunk_length=self.config.get("min_chunk_length", 10)
         )
 
         self.vector_store = VectorStore(
@@ -65,8 +62,7 @@ class RAGOrchestrator:
             embedding_dim=self.config.get("embedding_dim", 768),
             chunks_dir=self.config["data"].get("chunks", "data/chunks/prefettura_v1.3.1_chunks"),
             embeddings_dir=self.config["data"].get("embeddings", "data/embeddings/prefettura_v1.3.1_embeddings"),
-            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json"),
-            logger=self.logger
+            metadata_path=self.config["data"].get("embeddings_metadata", "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json")
         )
 
         self.retriever = MilvusRetriever(
@@ -74,25 +70,23 @@ class RAGOrchestrator:
             embedding_model=self.config["model"].get("embedding_model", EncoderModels.ITALIAN_LEGAL_BERT_SC.value),
             milvus_host=self.config.get("milvus_host", "localhost"),
             milvus_port=self.config.get("milvus_port", "19530"),
-            reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value),
-            logger=self.logger
+            reranker_model=self.config["model"].get("reranker_model", EncoderModels.ITALIAN_LEGAL_BERT.value)
         )
 
         self.augmenter = Augmenter(
             max_contexts=self.config.get("max_augmentation_contexts", 5),
             max_context_length=self.config.get("max_context_length", 1000),
-            max_parent_length=self.config.get("max_parent_length", 2000),
-            logger=self.logger
+            max_parent_length=self.config.get("max_parent_length", 2000)
         )
         
         self.generator = LLMGenerator(
             model_path=self.config['model'].get("model_path", LargeLanguageModels.MBART_LARGE_50.value),
-            # adapter_path=self.config.get("adapter_path", None),
-            tokenizer_path=self.config.get("tokenizer_path", None),
+            adapter_path=self.config['model'].get("adapter_path", None),
+            tokenizer_path=self.config['model'].get("tokenizer_path", None),
             model_type=self.config['model'].get("model_type", ModelTypes.CASUAL.value),
             max_length=self.config.get("max_input_tokenization_length", 2048),
             device=self.config.get("device", "auto"),
-            logger=self.logger
+            repetition_penalty=self.config.get("repetition_penalty", 1.0)
         )
 
     def process_file(self, file_path: str) -> bool:
@@ -213,12 +207,12 @@ class RAGOrchestrator:
                     continue
                 query = item["Italian"]
                 result = self.process_query(query, top_k)
-                # Include contexts in output JSON if extended is True
                 output_item = {
                     "query": query,
                     "answer": result["response"]
                 }
-                if extended:
+                if extended: # Include prompt and contexts in output JSON if extended is True
+                    output_item["prompt"] = result["prompt"]
                     output_item["contexts"] = [
                         {
                             "chunk_id": context["chunk_id"],
@@ -264,7 +258,7 @@ def main():
     parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses_v1.3.1.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_(leggi_area3)(reranking_bm25_deduplication)(repetition_penalty_sampling_temprature_topp)_falcon7binstruct_extended.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 

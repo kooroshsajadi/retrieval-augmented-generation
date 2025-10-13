@@ -19,7 +19,7 @@ class DataValidator:
             logger (logging.Logger, optional): Logger instance.
         """
         self.supported_formats = [fmt.lower() for fmt in supported_formats]
-        self.logger = logger or setup_logger("data_validator")
+        self.logger = logger or setup_logger("src.validation.validate_data")
 
     def validate_file(self, file_path: str) -> Dict[str, Any]:
         """

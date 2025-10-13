@@ -30,7 +30,7 @@ class MilvusRetriever:
             reranker_model (str): Cross-encoder model for reranking.
             logger (logging.Logger, optional): Logger instance.
         """
-        self.logger = logger or setup_logger("src.retrieval.retriever")
+        self.logger = logger or setup_logger("src.retrieval.MilvusRetriever")
         self.encoder = QueryEncoder(embedding_model=embedding_model, logger=self.logger)
         self.connector = MilvusConnector(
             collection_name=collection_name,

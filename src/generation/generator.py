@@ -16,6 +16,7 @@ class LLMGenerator:
         model_type: str = "causal",
         max_length: int = 2048,
         device: str = "auto",
+        repetition_penalty: float = 1.0,
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -28,11 +29,13 @@ class LLMGenerator:
             model_type (str): Type of model ('causal' for generative models).
             max_length (int): Maximum input length for tokenization.
             device (str): Device to run model on ('auto', 'cpu', 'cuda').
+            repetition_penalty (float): Penalty for repeating tokens (>1.0 to enable). Default: 1.0 (disabled).
             logger (Optional[logging.Logger]): Logger instance.
         """
         self.logger = logger or setup_logger("src.generation.llm_generator")
         self.max_length = max_length
         self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else ("xpu" if torch.xpu.is_available() else "cpu"))
+        self.repetition_penalty = repetition_penalty
         self.model_type = model_type
 
         try:
@@ -46,7 +49,7 @@ class LLMGenerator:
             self.model = self.model_loader.model
             tokenizer_source = tokenizer_path if tokenizer_path is not None else model_path
             self.tokenizer = create_and_configure_tokenizer(model=self.model, model_name=model_path, tokenizer_path=tokenizer_source)
-            self.logger.info("Loaded model %s and tokenizer %s on %s", model_path, tokenizer_source, self.device)
+            self.logger.info("Loaded model %s with repetition_penalty %s and tokenizer %s on %s", model_path, self.repetition_penalty, tokenizer_source, self.device)
         except Exception as e:
             self.logger.error("Failed to load model or tokenizer: %s", str(e))
             raise
@@ -96,9 +99,10 @@ class LLMGenerator:
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
+                do_sample=True, # Optional: Enable sampling for more diversity
+                temperature=0.7, # Optional: Adjust for creativity (lower = more deterministic)
+                repetition_penalty=self.repetition_penalty,
+                top_p=0.9, # Optional: Nucleus sampling (combine with repetition_penalty)
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )

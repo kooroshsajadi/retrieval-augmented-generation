@@ -34,11 +34,11 @@ class TextCleaner:
 
         # Patterns for cleaning
         self.header_footer_patterns = [
-            r"Page\s+\d+\s*(of\s+\d+)?",  # e.g., "Page 1", "Page 1 of 5"
+            # r"Page\s+\d+\s*(of\s+\d+)?",  # e.g., "Page 1", "Page 1 of 5"
             # r"\d{1,2}/\d{1,2}/\d{2,4}",  # e.g., "12/31/2023"
             # r"\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?",  # e.g., "12:30", "12:30:45 PM"
         ]
-        self.special_char_pattern = r"[^\w\sàèìòùÀÈÌÒÙ.,:-;'\"“”‘’()]"
+        self.diacritics = r"[^\w\sàèìòùÀÈÌÒÙ.,:-;'\"“”‘’()]"
 
     def clean_text(self, text: str) -> str:
         """
@@ -58,11 +58,11 @@ class TextCleaner:
             text = re.sub(r"\s+", " ", text.strip())
 
             # Remove headers/footers
-            for pattern in self.header_footer_patterns:
-                text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+            # for pattern in self.header_footer_patterns:
+            #     text = re.sub(pattern, "", text, flags=re.IGNORECASE)
 
             # Remove special characters (preserve diacritics)
-            text = re.sub(self.special_char_pattern, "", text)
+            text = re.sub(self.diacritics, "", text)
 
             # Normalize multiple spaces again
             text = re.sub(r"\s+", " ", text.strip())
@@ -86,7 +86,7 @@ class TextCleaner:
             return False
 
         # Check for Italian diacritics or legal terms
-        if re.search(r'[àèìòù]', text, re.IGNORECASE) or re.search(r'\b(legge|decreto|articolo)\b', text, re.IGNORECASE):
+        if re.search(r'[àèìòùÀÈÌÒÙ]', text, re.IGNORECASE): #or re.search(r'\b(legge|decreto|articolo)\b', text, re.IGNORECASE):
             return True
 
         # Fallback: At least 5 words
@@ -195,8 +195,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
     try:
         cleaner = TextCleaner(
-            input_dir='data/prefettura_v1.3_texts',
-            output_dir='data/prefettura_v1.3.1_cleaned_texts',
+            input_dir='data/leggi_area_3_text',
+            output_dir='data/leggi_area_3_cleaned_texts',
             min_text_length=20
         )
         cleaner.process_directory()

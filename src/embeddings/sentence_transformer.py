@@ -24,7 +24,7 @@ class EmbeddingGenerator:
         model_name: str = "dlicari/Italian-Legal-BERT-SC",
         logger: Optional[logging.Logger] = None,
         chunking_strategy=ChunkingStrategy.PARENT.value,
-        metadata_path: Optional[str] = "data/embeddings/prefettura_v1.3.1_embeddings/embeddings_prefettura_v1.3.1.json",
+        metadata_path: Optional[str] = "data/metadata/embeddings_leggi_area_3.json",
     ):
         """
         Initialize EmbeddingGenerator with configuration parameters.
@@ -83,6 +83,68 @@ class EmbeddingGenerator:
             self.logger.error("Failed to load chunking metadata: %s", str(e))
             raise
 
+    def generate_embedding_with_fallback(self, text: str) -> np.ndarray:
+        """
+        Generate embedding for a single text chunk with OOM fallback.
+    
+        Args:
+            text (str): Text chunk to embed.
+    
+        Returns:
+            np.ndarray: Embedding vector, or empty array on failure.
+        """
+        if not text or not isinstance(text, str):
+            self.logger.warning("Empty or invalid text provided for embedding")
+            return np.array([])
+    
+        try:
+            # Initial attempt on current device (GPU/XPU)
+            embedding = self.model.encode(
+                text, 
+                normalize_embeddings=True,
+                max_length=512,  # Cap to reduce memory footprint
+                truncate=True
+            )
+            # Clear cache to prevent accumulation
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            elif torch.xpu.is_available():
+                torch.xpu.empty_cache()
+            self.logger.debug("Generated embedding for text (length: %d) on %s", len(text), self.model.device)
+            return embedding
+    
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower() or "UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY" in str(e):
+                self.logger.warning("GPU OOM on text (len: %d). Retrying on CPU...", len(text))
+                try:
+                    # Fallback: Temporarily move model to CPU and encode
+                    original_device = self.model.device
+                    self.model = self.model.to("cpu")  # Move to CPU
+                    embedding = self.model.encode(
+                        text, 
+                        normalize_embeddings=True,
+                        max_length=512,
+                        truncate=True
+                    )
+                    # Move back to original device
+                    self.model = self.model.to(original_device)
+                    # Clear CPU cache (less critical but good practice)
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    elif torch.xpu.is_available():
+                        torch.xpu.empty_cache()
+                    self.logger.info("Fallback to CPU succeeded for text (len: %d)", len(text))
+                    return embedding
+                except Exception as cpu_e:
+                    self.logger.error("CPU fallback failed: %s", str(cpu_e))
+                    return np.array([])
+            else:
+                # Non-OOM error: re-raise
+                raise
+        except Exception as e:
+            self.logger.error("Embedding generation failed: %s", str(e))
+            return np.array([])
+    
     def generate_embedding(self, text: str) -> np.ndarray:
         """
         Generate embedding for a single text chunk.
@@ -221,7 +283,7 @@ class EmbeddingGenerator:
             self.logger.error("File embedding failed: %s", str(e))
             return result
 
-    def process_internal_file(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def process_parent_child_chunks(self, file_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process child chunks for a single file and generate embeddings.
 
@@ -240,7 +302,7 @@ class EmbeddingGenerator:
             "chunk_embeddings": []
         }
 
-        self.logger.info("Processing file: %s", file_metadata["file_path"])
+        self.logger.info("Processing file: %s", Path(file_metadata["file_path"]))
         try:
             for chunk_meta in file_metadata["chunks_metadata"]:
                 if chunk_meta["chunk_type"] != "child":
@@ -318,7 +380,7 @@ class EmbeddingGenerator:
                 if not file_metadata["is_valid"]:
                     self.logger.warning("Skipping invalid file: %s", file_metadata["file_path"])
                     continue
-                result = self.process_internal_file(file_metadata)
+                result = self.process_parent_child_chunks(file_metadata)
                 results.append(result)
                 processed_files += 1
         else:
@@ -361,13 +423,14 @@ class EmbeddingGenerator:
             return []
 
 if __name__ == "__main__":
-    with open('src/configs/config.yaml') as file:
-        config = yaml.safe_load(file)
+    # with open('src/configs/config.yaml') as file:
+    #     config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir=config['chunks'].get('prefettura_v1.3.1', 'data/chunks/prefettura_v1.3.1_chunks'),
-            output_dir=config['embeddings'].get('prefettura_v1.3.1', 'data/embeddings/prefettura_v1.3.1_embeddings'),
-            chunking_info_path=config['metadata'].get('chunking_prefettura_v1.3.1', 'data/metadata/chunking_prefettura_v1.3.1_chunks_parent.json'),
+            input_dir='data/chunks/leggi_area_3_chunks',
+            output_dir='data/embeddings/leggi_area_3_embeddings',
+            chunking_info_path='data/metadata/chunking_leggi_area_3_chunks_parent_linux.json',
+            metadata_path="data/metadata/embeddings_leggi_area_3.json",
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
             chunking_strategy=ChunkingStrategy.PARENT.value
         )
