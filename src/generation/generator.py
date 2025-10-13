@@ -16,6 +16,7 @@ class LLMGenerator:
         model_type: str = "causal",
         max_length: int = 2048,
         device: str = "auto",
+        repetition_penalty: float = 1.0,
         logger: Optional[logging.Logger] = None
     ):
         """
@@ -28,11 +29,13 @@ class LLMGenerator:
             model_type (str): Type of model ('causal' for generative models).
             max_length (int): Maximum input length for tokenization.
             device (str): Device to run model on ('auto', 'cpu', 'cuda').
+            repetition_penalty (float): Penalty for repeating tokens (>1.0 to enable). Default: 1.0 (disabled).
             logger (Optional[logging.Logger]): Logger instance.
         """
         self.logger = logger or setup_logger("src.generation.llm_generator")
         self.max_length = max_length
         self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else ("xpu" if torch.xpu.is_available() else "cpu"))
+        self.repetition_penalty = repetition_penalty
         self.model_type = model_type
 
         try:
@@ -98,6 +101,7 @@ class LLMGenerator:
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
                 temperature=0.7,
+                repetition_penalty=self.repetition_penalty,
                 top_p=0.9,
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
