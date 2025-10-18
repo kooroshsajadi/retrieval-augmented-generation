@@ -333,7 +333,7 @@ if __name__ == "__main__":
         logger=logger
     )
 
-    success = vector_store.bulk_insert(force_recreate=True)
+    success = vector_store.bulk_insert(force_recreate=False)
     if success:
         logger.info("Bulk insertion completed successfully")
     else:
