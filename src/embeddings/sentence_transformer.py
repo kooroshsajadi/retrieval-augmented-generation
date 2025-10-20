@@ -427,10 +427,10 @@ if __name__ == "__main__":
     #     config = yaml.safe_load(file)
     try:
         generator = EmbeddingGenerator(
-            input_dir='data/chunks/leggi_area_3_chunks',
-            output_dir='data/embeddings/leggi_area_3_embeddings',
-            chunking_info_path='data/metadata/chunking_leggi_area_3_chunks_parent_linux.json',
-            metadata_path="data/metadata/embeddings_leggi_area_3.json",
+            input_dir='data/chunks/prefettura_1_chunks',
+            output_dir='data/embeddings/prefettura_1_embeddings',
+            chunking_info_path='data/metadata/chunking_prefettura_1_parent.json',
+            metadata_path="data/metadata/embeddings_prefettura_1.json",
             model_name=EncoderModels.ITALIAN_LEGAL_BERT_SC.value,
             chunking_strategy=ChunkingStrategy.PARENT.value
         )

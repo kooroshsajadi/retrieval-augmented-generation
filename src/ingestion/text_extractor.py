@@ -126,9 +126,9 @@ class TextExtractor:
 
 if __name__ == "__main__":
     extractor = TextExtractor(
-        input_dir=Path("data/leggi_area_3"),
-        output_dir=Path("data/leggi_area_3_text"),
-        output_metadata_file=Path("data/metadata/extraction_leggi_area_3.json"),
+        input_dir=Path("data/prefettura_1_files"),
+        output_dir=Path("data/prefettura_1_texts"),
+        output_metadata_file=Path("data/metadata/extraction_prefettura_1.json"),
         language='ita'
     )
     extractor.process_directory()

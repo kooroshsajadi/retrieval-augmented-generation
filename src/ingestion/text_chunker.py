@@ -20,6 +20,7 @@ class TextChunker:
         self,
         input_dir: str = "data/cleaned_text",
         output_dir: str = "data/chunked_text",
+        output_metadata_file: Path = Path("data/metadata/chunking_metadata.json"),
         max_chunk_length: int = 2000,
         min_chunk_length: int = 10,
         max_tokens: int = 768,
@@ -33,6 +34,7 @@ class TextChunker:
         Args:
             input_dir (str): Directory containing cleaned text files.
             output_dir (str): Directory to save chunked text and metadata.
+            output_metadata_file (Path): Path to save chunking metadata.
             max_chunk_length (int): Maximum characters per chunk (for parent) or words (for sentence-based).
             min_chunk_length (int): Minimum character count for valid chunks.
             max_tokens (int): Maximum tokens per chunk to respect embedding model limits.
@@ -42,6 +44,7 @@ class TextChunker:
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
+        self.output_metadata_file = output_metadata_file
         self.max_chunk_length = max_chunk_length
         self.min_chunk_length = min_chunk_length
         self.max_tokens = max_tokens
@@ -261,29 +264,27 @@ class TextChunker:
             processed_files += 1
 
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
-        summary_file = f"data/metadata/leggi_area_3_chunks_{self.chunking_strategy}.json"
         try:
-            with open(summary_file, "w", encoding="utf-8") as f:
+            with open(self.output_metadata_file, "w", encoding="utf-8") as f:
                 json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved chunking summary to %s", summary_file)
+            self.logger.info("Saved chunking summary to %s", self.output_metadata_file)
         except Exception as e:
             self.logger.error("Failed to save chunking summary: %s", str(e))
 
 if __name__ == "__main__":
-    with open('src/configs/config.yaml') as file:
-        config = yaml.safe_load(file)
     try:
         embedder = SentenceTransformer(EncoderModels.ITALIAN_LEGAL_BERT_SC.value)
         chunker = TextChunker(
-            input_dir=config['cleaned_texts'].get('leggi_area_3', 'data/leggi_area_3_cleaned_texts'),
-            output_dir=config['chunks'].get('leggi_area_3', 'data/chunks/leggi_area_3_chunks'),
+            input_dir='data/prefettura_1_cleaned_texts',
+            output_dir='data/chunks/prefettura_1_chunks',
+            output_metadata_file=Path("data/metadata/chunking_prefettura_1_parent.json"),
             max_chunk_length=2000,
             min_chunk_length=10,
             max_tokens=768,
-            chunking_strategy=config.get('chunking_strategy', ChunkingStrategy.PARENT.value),
+            chunking_strategy=ChunkingStrategy.PARENT.value,
             embedder=embedder
         )
-        chunker.process_directory(cleaning_summary_path=Path('data/metadata/cleaning_leggi_area_3.json'))
+        chunker.process_directory(cleaning_summary_path=Path('data/metadata/cleaning_prefettura_1.json'))
         print("Text chunking completed.")
     except Exception as e:
         print(f"Error during text chunking: {e}")
