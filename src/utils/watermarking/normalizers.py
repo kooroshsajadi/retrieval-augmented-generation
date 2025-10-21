@@ -8,7 +8,6 @@ require messing with the limited rust interface of tokenizers.NormalizedString
 """
 from collections import defaultdict
 from functools import cache
-
 import re
 import unicodedata
 import homoglyphs as hg
