@@ -49,7 +49,7 @@ python -m main
 
 ## 🙏 Acknowledgments
 
-This project incorporates watermarking functionality from the [`lm-watermarking` repository](https://github.com/jwkirchenbauer/lm-watermarking), developed by John Kirchenbauer et al., licensed under the Apache License, Version 2.0. The script `watermark_processor.py` (e.g., `extended_watermark_processor.py`) is included in `src/generation/` along with its corresponding LICENSE file (`src/generation/LICENSE.md`). The script is adapted to integrate with the `LLMGenerator` class for watermarking AI-generated legal text outputs in the RAG pipeline.
+This project incorporates watermarking functionality from the [`lm-watermarking` repository](https://github.com/jwkirchenbauer/lm-watermarking), developed by John Kirchenbauer et al., licensed under the Apache License, Version 2.0. The script `watermark_processor.py` (e.g., `extended_watermark_processor.py`) is included in `src/generation/` while the scripts `alternative_prf_schemes.py`, `homoglyphs.py`, and `normalizers.py` are included in `src/utils/watermarking/`. Their associated LICENSE file is included in (`third_party/LICENSE.md`). The scripts are adapted to integrate with the `LLMGenerator` class for watermarking AI-generated legal text outputs in the RAG pipeline.
 
 ## 📄 License
 
