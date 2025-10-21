@@ -22,14 +22,12 @@ import collections
 from math import sqrt
 from itertools import chain, tee
 from functools import lru_cache
-
 import scipy.stats
 import torch
 from tokenizers import Tokenizer
 from transformers.generation.logits_process import LogitsProcessor
-
-from normalizers import normalization_strategy_lookup
-from alternative_prf_schemes import prf_lookup, seeding_scheme_lookup
+from src.utils.watermarking.normalizers import normalization_strategy_lookup
+from src.utils.watermarking.alternative_prf_schemes import prf_lookup, seeding_scheme_lookup
 
 
 class WatermarkBase:
