@@ -10,7 +10,7 @@ from collections import defaultdict
 from functools import cache
 import re
 import unicodedata
-import homoglyphs as hg
+import src.utils.watermarking.homoglyphs as hg
 
 
 def normalization_strategy_lookup(strategy_name: str) -> object:
