@@ -162,13 +162,14 @@ class RAGOrchestrator:
             prompt = self.augmenter.augment(query, contexts)
 
             # Generate response
-            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
+            response, score_dict = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
             self.logger.info("Generated response: %s...", response[:100])
+            self.logger.info("Watermark scores: %s", score_dict)
 
-            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt}
+            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt, "watermark_score_dict": score_dict}
         except Exception as e:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
-            return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": ""}
+            return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": "", "watermark_score_dict": {}}
 
     def process_queries_from_file(
         self,
@@ -222,6 +223,7 @@ class RAGOrchestrator:
                             "parent_text": context.get("parent_text")
                         } for context in result["contexts"]
                     ]
+                    output_item["watermark_scores"] = result["watermark_score_dict"]
 
                 results.append(output_item)
                 prompts.append(result["prompt"])
