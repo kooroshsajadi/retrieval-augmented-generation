@@ -5,7 +5,7 @@ import torch
 from transformers.generation import LogitsProcessorList
 from src.utils.models.model_utils import create_and_configure_tokenizer
 from src.utils.models.model_types import MODEL_LOADER_MAPPING
-from src.generation.watermark_processor import WatermarkLogitsProcessor, WatermarkDetector
+from src.generation.watermark_processor import WatermarkLogitsProcessor
 
 class LLMGenerator:
     """Generates responses using a language model for the RAG pipeline."""
@@ -75,7 +75,7 @@ class LLMGenerator:
         )
         return f"{instruction}\n\n**Query**: {query}\n\n**Contesti**:\n{contexts}"
 
-    def generate(self, prompt: str, max_new_tokens: int = 200) -> Tuple[str, dict]:
+    def generate(self, prompt: str, max_new_tokens: int = 200) -> str:
         """
         Generate a response from a formatted prompt.
 
@@ -129,19 +129,11 @@ class LLMGenerator:
             self.logger.info(f'Output shape: {outputs.shape}')
             response = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
             self.logger.info("Generated response %s for query: %s...", response[:25], query[:25])
-            watermark_detector = WatermarkDetector(vocab=list(self.tokenizer.get_vocab().values()),
-                                        gamma=0.25, # should match original setting
-                                        seeding_scheme="selfhash", # should match original setting
-                                        device=self.model.device, # must match the original rng device type
-                                        tokenizer=self.tokenizer,
-                                        z_threshold=4.0,
-                                        normalizers=[],
-                                        ignore_repeated_ngrams=True)
-            score_dict = watermark_detector.detect(response)
-            return (response.strip(), score_dict)
+
+            return response.strip()
         except Exception as e:
             self.logger.error("Generation failed for query '%s': %s", query[:50], str(e))
-            return (f"Error: {str(e)}", {})
+            return f"Error: {str(e)}"
 
 if __name__ == "__main__":
     # Example usage

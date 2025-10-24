@@ -6,7 +6,6 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from src.ingestion.text_chunker import TextChunker
 from src.utils.models.bi_encoders import EncoderModels
-import yaml
 from src.utils.logging_utils import setup_logger
 import torch
 from src.utils.ingestion.chunk_strategy import ChunkingStrategy

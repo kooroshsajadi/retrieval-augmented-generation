@@ -223,7 +223,6 @@ class RAGOrchestrator:
                             "parent_text": context.get("parent_text")
                         } for context in result["contexts"]
                     ]
-                    output_item["watermark_scores"] = result["watermark_score_dict"]
 
                 results.append(output_item)
                 prompts.append(result["prompt"])

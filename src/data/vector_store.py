@@ -307,13 +307,13 @@ class VectorStore:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bulk insert data into Milvus collection")
-    parser.add_argument("--collection_name", type=str, default="gotmat_collection", help="Milvus collection name")
+    parser.add_argument("--collection_name", type=str, default="gotmat_finetuning_collection", help="Milvus collection name")
     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
     parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")
-    parser.add_argument("--chunks_dir", type=str, default="data/chunks/_prefettura_1_chunks", help="Directory containing chunked text files")
-    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/prefettura_1_embeddings", help="Directory containing embedding files")
-    parser.add_argument("--metadata_path", type=str, default="data/metadata/embeddings_prefettura_1.json", help="Embedding metadata file")
+    parser.add_argument("--chunks_dir", type=str, default="data/chunks/leggi_area_3_chunks", help="Directory containing chunked text files")
+    parser.add_argument("--embeddings_dir", type=str, default="data/embeddings/leggi_area_3_embeddings", help="Directory containing embedding files")
+    parser.add_argument("--metadata_path", type=str, default="data/metadata/embeddings_leggi_area_3.json", help="Embedding metadata file")
     args = parser.parse_args()
 
     logger = setup_logger("src.data.vector_store")
@@ -333,7 +333,7 @@ if __name__ == "__main__":
         logger=logger
     )
 
-    success = vector_store.bulk_insert(force_recreate=False)
+    success = vector_store.bulk_insert(force_recreate=True)
     if success:
         logger.info("Bulk insertion completed successfully")
     else:
