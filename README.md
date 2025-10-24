@@ -47,6 +47,10 @@ python -m main
 
 > **Note**: This project is **under active development**. Expect changes in structure and functionality in the near future. Currently focused on document deduplication management.
 
+## 🙏 Acknowledgments
+
+This project incorporates watermarking functionality from the [`lm-watermarking` repository](https://github.com/jwkirchenbauer/lm-watermarking), developed by John Kirchenbauer et al., licensed under the Apache License, Version 2.0. The script `watermark_processor.py` (e.g., `extended_watermark_processor.py`) is included in `src/generation/` while the scripts `alternative_prf_schemes.py`, `homoglyphs.py`, and `normalizers.py` are included in `src/utils/watermarking/`. Their associated LICENSE file is included in (`third_party/LICENSE.md`). The scripts are adapted to integrate with the `LLMGenerator` class for watermarking AI-generated legal text outputs in the RAG pipeline.
+
 ## 📄 License
 
 This project is licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0) (the "License"). You may not use, copy, modify, or distribute this project except in compliance with the License. A copy of the License is included in the [LICENSE](./LICENSE) file in this repository.
