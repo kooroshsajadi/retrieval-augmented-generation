@@ -162,14 +162,14 @@ class RAGOrchestrator:
             prompt = self.augmenter.augment(query, contexts)
 
             # Generate response
-            response, score_dict = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
+            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
             self.logger.info("Generated response: %s...", response[:100])
-            self.logger.info("Watermark scores: %s", score_dict)
+            # self.logger.info("Watermark scores: %s", score_dict)
 
-            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt, "watermark_score_dict": score_dict}
+            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt}
         except Exception as e:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
-            return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": "", "watermark_score_dict": {}}
+            return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": ""}
 
     def process_queries_from_file(
         self,
@@ -256,10 +256,10 @@ class RAGOrchestrator:
 
 def main():
     parser = argparse.ArgumentParser(description="RAG Pipeline Orchestrator")
-    parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
+    parser.add_argument("--queries_file", default="data/queries/attacked_queries.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses_(complete_data)(reranking_bm25_deduplication)(repetition_penalty_sampling_temperature_topp)_distilgpt2_extended.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_(complete_data)(reranking_bm25_deduplication)(repetition_penalty_sampling_temperature_topp)_distilgpt2_attacked_queries_extended.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 
