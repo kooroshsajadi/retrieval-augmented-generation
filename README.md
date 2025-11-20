@@ -29,6 +29,9 @@ This component implements hybrid retrieval by combining BM25 sparse retrieval fo
 
 This component refines fused candidates from hybrid retrieval using a cross-encoder model, such as `dlicari/Italian-Legal-BERT`, which jointly embeds query and chunk pairs to compute nuanced relevance scores beyond initial similarity metrics.
 
+### 🛡️ Anonymization
+Before passing prompts to the generator, an anonymization step is applied to mask private names in the input text. This step employs the `DeepMount00/universal_ner_ita` model, a zero-shot named entity recognition model tailored specifically for Italian language texts. It detects and replaces personal names with a generic placeholder to ensure privacy and compliance with data protection requirements.
+
 ### 📝 Logging
 
 Logging is embedded in each module using Python's built-in logging library, with loggers named by module to enable granular control and avoid root logger conflicts. Messages are categorized by levels (DEBUG for diagnostics, INFO for workflow tracking, WARNING/ERROR for issues) and output to console for real-time monitoring while persisting to timestamped files in `logs/` for auditing and debugging in the RAG pipeline.
@@ -45,11 +48,13 @@ python -m main
 
 ## 🚧 Status
 
-> **Note**: This project is **under active development**. Expect changes in structure and functionality in the near future. Currently focused on document deduplication management.
+> **Note**: This project is **under active development**. Expect changes in structure and functionality in the near future.
 
 ## 🙏 Acknowledgments
 
 This project incorporates watermarking functionality from the [`lm-watermarking` repository](https://github.com/jwkirchenbauer/lm-watermarking), developed by John Kirchenbauer et al., licensed under the Apache License, Version 2.0. The script `watermark_processor.py` (e.g., `extended_watermark_processor.py`) is included in `src/generation/` while the scripts `alternative_prf_schemes.py`, `homoglyphs.py`, and `normalizers.py` are included in `src/utils/watermarking/`. Their associated LICENSE file is included in (`third_party/LICENSE.md`). The scripts are adapted to integrate with the `LLMGenerator` class for watermarking AI-generated legal text outputs in the RAG pipeline.
+
+This project also uses the anonymization model from [`DeepMount00/universal_ner_ita` · Hugging Face](https://huggingface.co/DeepMount00/universal_ner_ita) to mask personal names in Italian texts as part of the prompt preprocessing step.
 
 ## 📄 License
 
