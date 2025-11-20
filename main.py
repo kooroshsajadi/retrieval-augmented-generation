@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Union
 import numpy as np
+from src.utils.anonymizer import Anonymizer
 from src.utils.logging_utils import setup_logger
 from src.validation.validate_data import DataValidator
 from src.ingestion.ingest_data import DataIngestor
@@ -161,11 +162,16 @@ class RAGOrchestrator:
             # Augment query with contexts
             prompt = self.augmenter.augment(query, contexts)
 
-            # Generate response
-            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
-            self.logger.info("Generated response: %s...", response[:100])
+            # Apply anonymizer
+            anonymizer = Anonymizer()
+            anonymized_prompt = anonymizer.anonymize(prompt)
 
-            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt}
+            # Generate response
+            response = self.generator.generate(anonymized_prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
+            self.logger.info("Generated response: %s...", response[:100])
+            # self.logger.info("Watermark scores: %s", score_dict)
+
+            return {"query": query, "response": response, "contexts": contexts, "prompt": anonymized_prompt}
         except Exception as e:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
             return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": ""}
@@ -255,10 +261,10 @@ class RAGOrchestrator:
 
 def main():
     parser = argparse.ArgumentParser(description="RAG Pipeline Orchestrator")
-    parser.add_argument("--queries_file", default="data/prompts.json", type=str, help="Path to JSON file with queries")
+    parser.add_argument("--queries_file", default="data/queries/attacked_queries.json", type=str, help="Path to JSON file with queries")
     parser.add_argument("--file", type=str, help="Path to optional input file (PDF, text)")
     parser.add_argument("--config", type=str, default="configs/rag.yaml", help="Path to configuration file")
-    parser.add_argument("--output", type=str, default="data/results/responses_(leggi_area3)(reranking_bm25_deduplication)(repetition_penalty_sampling_temprature_topp)_falcon7binstruct_extended.json", help="Path to save query responses")
+    parser.add_argument("--output", type=str, default="data/results/responses_(complete_data)(reranking_bm25_deduplication)(repetition_penalty_sampling_temperature_topp)_distilgpt2_attacked_queries_extended.json", help="Path to save query responses")
     parser.add_argument("--extended", action="store_true", help="Print extended output with top-k closest chunks")
     args = parser.parse_args()
 

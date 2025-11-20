@@ -35,6 +35,7 @@ class AbstractModelLoader(ABC):
         """
         self.model_name = model_name
         self.max_length = max_length
+        self.adapter_path = adapter_path
         self.logger = logger or setup_logger("src.utils.models.abstract_model_loader")
 
         # Detect model config and validate against expected for this subclass
@@ -72,12 +73,12 @@ class AbstractModelLoader(ABC):
             raise
 
         # Load LoRA adapters if provided
-        if adapter_path:
+        if self.adapter_path:
             try:
-                self.model = PeftModel.from_pretrained(base_model, adapter_path).to(self.device)
-                self.logger.info(f"Loaded base model {model_name} with adapter from {adapter_path}")
+                self.model = PeftModel.from_pretrained(base_model, self.adapter_path).to(self.device)
+                self.logger.info(f"Loaded base model {model_name} with adapter from {self.adapter_path}")
             except Exception as e:
-                self.logger.error(f"Failed to load adapter model from {adapter_path}: {str(e)}")
+                self.logger.error(f"Failed to load adapter model from {self.adapter_path}: {str(e)}")
                 raise
         else:
             self.model = base_model
@@ -149,6 +150,7 @@ class AbstractModelLoader(ABC):
             f"\n{title}\n"
             f"- Model name: {self.model_name}\n"
             f"- Model type: {self.model_type}\n"
+            f"- Adapter path: {self.adapter_path}\n"
             f"- Device: {self.device}\n"
             f"- Dtype: {self.dtype}\n"
             f"- Total params: {self._format_count(total_params)} ({total_params:,})\n"

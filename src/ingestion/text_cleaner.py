@@ -14,6 +14,7 @@ class TextCleaner:
         self,
         input_dir: str = "data/extracted_text",
         output_dir: str = "data/cleaned_text",
+        output_metadata_file: Path = Path("data/metadata/cleaning_metadata.json"),
         min_text_length: int = 20,
     ):
         """
@@ -22,11 +23,13 @@ class TextCleaner:
         Args:
             input_dir (str): Directory containing extracted text files.
             output_dir (str): Directory to save cleaned text.
+            output_metadata_file (Path): Path to save cleaning metadata.
             min_text_length (int): Minimum character count for valid cleaned text.
         """
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
         self.min_text_length = min_text_length
+        self.output_metadata_file = output_metadata_file
         self.logger = setup_logger("text_cleaner")
 
         # Ensure output directory exists
@@ -180,23 +183,21 @@ class TextCleaner:
 
         self.logger.info("Processed %d/%d text files", processed_files, len(text_files))
 
-        # Save all metadata in a single summary JSON file (without cleaned_text field)
-        summary_file = self.output_dir / "cleaning_summary.json"
+        # Save all metadata in a single summary JSON file.
         try:
-            with open(summary_file, "w", encoding="utf-8") as f:
+            with open(self.output_metadata_file, "w", encoding="utf-8") as f:
                 json.dump(metadata_collection, f, ensure_ascii=False, indent=2)
-            self.logger.info("Saved cleaning summary metadata to %s", summary_file)
+            self.logger.info("Saved cleaning summary metadata to %s", self.output_metadata_file)
         except Exception as e:
             self.logger.error("Failed to save cleaning summary metadata: %s", str(e))
 
 
 if __name__ == "__main__":
-    with open('src/configs/config.yaml') as file:
-        config = yaml.safe_load(file)
     try:
         cleaner = TextCleaner(
-            input_dir='data/leggi_area_3_text',
-            output_dir='data/leggi_area_3_cleaned_texts',
+            input_dir='data/prefettura_1_texts',
+            output_dir='data/prefettura_1_cleaned_texts',
+            output_metadata_file=Path("data/metadata/cleaning_prefettura_1.json"),
             min_text_length=20
         )
         cleaner.process_directory()

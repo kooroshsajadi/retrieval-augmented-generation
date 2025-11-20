@@ -307,7 +307,7 @@ class VectorStore:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bulk insert data into Milvus collection")
-    parser.add_argument("--collection_name", type=str, default="gotmat_collection", help="Milvus collection name")
+    parser.add_argument("--collection_name", type=str, default="gotmat_finetuning_collection", help="Milvus collection name")
     parser.add_argument("--milvus_host", type=str, default="localhost", help="Milvus server host")
     parser.add_argument("--milvus_port", type=str, default="19530", help="Milvus server port")
     parser.add_argument("--embedding_dim", type=int, default=768, help="Dimension of embedding vectors")

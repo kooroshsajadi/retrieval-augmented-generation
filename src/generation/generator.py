@@ -1,9 +1,11 @@
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 from src.utils.logging_utils import setup_logger
 import torch
+from transformers.generation import LogitsProcessorList
 from src.utils.models.model_utils import create_and_configure_tokenizer
 from src.utils.models.model_types import MODEL_LOADER_MAPPING
+from src.generation.watermark_processor import WatermarkLogitsProcessor
 
 class LLMGenerator:
     """Generates responses using a language model for the RAG pipeline."""
@@ -92,8 +94,22 @@ class LLMGenerator:
             # Format prompt with instruction
             formatted_prompt = self.format_prompt(query, contexts)
 
+            # Initialize watermarking processor
+            watermark_processor = WatermarkLogitsProcessor(vocab=list(self.tokenizer.get_vocab().values()),
+                                               gamma=0.25,
+                                               delta=2.0,
+                                               seeding_scheme="selfhash") # Equivalent to `ff-anchored_minhash_prf-4-True-15485863`
+            # Note:
+            # You can turn off self-hashing by setting the seeding scheme to `minhash`.
+            
             # Tokenize input
-            inputs = self.tokenizer(formatted_prompt, return_tensors="pt", max_length=self.max_length, truncation=True).to(self.device)
+            inputs = self.tokenizer(formatted_prompt
+                                    , return_tensors="pt"
+                                    , max_length=self.max_length
+                                    , truncation=True).to(self.device)
+            # note that if the model is on cuda, then the input is on cuda.
+            # and thus the watermarking rng is cuda-based.
+            # This is a different generator than the cpu-based rng in pytorch!
 
             # Generate response
             outputs = self.model.generate(
@@ -103,6 +119,7 @@ class LLMGenerator:
                 temperature=0.7, # Optional: Adjust for creativity (lower = more deterministic)
                 repetition_penalty=self.repetition_penalty,
                 top_p=0.9, # Optional: Nucleus sampling (combine with repetition_penalty)
+                logits_processor=LogitsProcessorList([watermark_processor]),
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
@@ -112,6 +129,7 @@ class LLMGenerator:
             self.logger.info(f'Output shape: {outputs.shape}')
             response = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
             self.logger.info("Generated response %s for query: %s...", response[:25], query[:25])
+
             return response.strip()
         except Exception as e:
             self.logger.error("Generation failed for query '%s': %s", query[:50], str(e))
