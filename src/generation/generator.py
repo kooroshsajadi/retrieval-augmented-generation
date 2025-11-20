@@ -95,10 +95,10 @@ class LLMGenerator:
             formatted_prompt = self.format_prompt(query, contexts)
 
             # Initialize watermarking processor
-            # watermark_processor = WatermarkLogitsProcessor(vocab=list(self.tokenizer.get_vocab().values()),
-            #                                    gamma=0.25,
-            #                                    delta=2.0,
-            #                                    seeding_scheme="selfhash") #equivalent to `ff-anchored_minhash_prf-4-True-15485863`
+            watermark_processor = WatermarkLogitsProcessor(vocab=list(self.tokenizer.get_vocab().values()),
+                                               gamma=0.25,
+                                               delta=2.0,
+                                               seeding_scheme="selfhash") # Equivalent to `ff-anchored_minhash_prf-4-True-15485863`
             # Note:
             # You can turn off self-hashing by setting the seeding scheme to `minhash`.
             
@@ -119,7 +119,7 @@ class LLMGenerator:
                 temperature=0.7, # Optional: Adjust for creativity (lower = more deterministic)
                 repetition_penalty=self.repetition_penalty,
                 top_p=0.9, # Optional: Nucleus sampling (combine with repetition_penalty)
-                # logits_processor=LogitsProcessorList([watermark_processor]),
+                logits_processor=LogitsProcessorList([watermark_processor]),
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
