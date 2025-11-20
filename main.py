@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, Union
 import numpy as np
+from src.utils.anonymizer import Anonymizer
 from src.utils.logging_utils import setup_logger
 from src.validation.validate_data import DataValidator
 from src.ingestion.ingest_data import DataIngestor
@@ -161,12 +162,16 @@ class RAGOrchestrator:
             # Augment query with contexts
             prompt = self.augmenter.augment(query, contexts)
 
+            # Apply anonymizer
+            anonymizer = Anonymizer()
+            anonymized_prompt = anonymizer.anonymize(prompt)
+
             # Generate response
-            response = self.generator.generate(prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
+            response = self.generator.generate(anonymized_prompt, max_new_tokens=self.config.get("max_new_tokens", 200))
             self.logger.info("Generated response: %s...", response[:100])
             # self.logger.info("Watermark scores: %s", score_dict)
 
-            return {"query": query, "response": response, "contexts": contexts, "prompt": prompt}
+            return {"query": query, "response": response, "contexts": contexts, "prompt": anonymized_prompt}
         except Exception as e:
             self.logger.error("Query processing failed for '%s': %s", query, str(e))
             return {"query": query, "response": f"Error: {str(e)}", "contexts": [], "prompt": ""}
