@@ -9,7 +9,7 @@ class Anonymizer:
     def __init__(
         self,
         model_name: str = "DeepMount00/universal_ner_ita",
-        labels: List[str] = ["persona", "nome"],
+        labels: List[str] = ["persona", "nome", "cognome", "nome completo"],
         replacement: str = "[PERSON]",
         logger: Optional[logging.Logger] = None
     ):
