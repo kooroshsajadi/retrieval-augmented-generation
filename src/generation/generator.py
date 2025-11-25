@@ -1,5 +1,6 @@
 import logging
 from typing import Optional, Tuple
+from src.models.ollama_model_loader import OllamaModelLoader
 from src.utils.logging_utils import setup_logger
 import torch
 from transformers.generation import LogitsProcessorList
@@ -41,17 +42,21 @@ class LLMGenerator:
         self.model_type = model_type
 
         try:
-            self.model_loader = MODEL_LOADER_MAPPING[self.model_type](
-                model_name=model_path,
-                device_map=self.device,
-                adapter_path=adapter_path,
-                tokenizer_path=tokenizer_path,
-                max_length=self.max_length
-            )
-            self.model = self.model_loader.model
-            tokenizer_source = tokenizer_path if tokenizer_path is not None else model_path
-            self.tokenizer = create_and_configure_tokenizer(model=self.model, model_name=model_path, tokenizer_path=tokenizer_source)
-            self.logger.info("Loaded model %s with repetition_penalty %s and tokenizer %s on %s", model_path, self.repetition_penalty, tokenizer_source, self.device)
+            if self.model_type != "ollama":
+                self.model_loader = MODEL_LOADER_MAPPING[self.model_type](
+                    model_name=model_path,
+                    device_map=self.device,
+                    adapter_path=adapter_path,
+                    tokenizer_path=tokenizer_path,
+                    max_length=self.max_length
+                )
+                self.model = self.model_loader.model
+                tokenizer_source = tokenizer_path if tokenizer_path is not None else model_path
+                self.tokenizer = create_and_configure_tokenizer(model=self.model, model_name=model_path, tokenizer_path=tokenizer_source)
+                self.logger.info("Loaded model %s with repetition_penalty %s and tokenizer %s on %s", model_path, self.repetition_penalty, tokenizer_source, self.device)
+            else:
+                self.model_loader = OllamaModelLoader(model_name=model_path)
+                self.logger.info("Loaded Ollama model %s on %s", model_path, self.device)
         except Exception as e:
             self.logger.error("Failed to load model or tokenizer: %s", str(e))
             raise
@@ -94,11 +99,21 @@ class LLMGenerator:
             # Format prompt with instruction
             formatted_prompt = self.format_prompt(query, contexts)
 
-            # Initialize watermarking processor
+            if self.model_type == "ollama":
+                # Call Ollama's generate (params are passed but ignored via CLI; use Modelfile)
+                return self.model_loader.generate(
+                    formatted_prompt,
+                    max_new_tokens=max_new_tokens,
+                    repetition_penalty=self.repetition_penalty,
+                    temperature=0.7,  # Match HF branch (ignored in CLI)
+                    top_p=0.9  # Match HF branch (ignored in CLI)
+                )
+
+            # Existing Hugging Face/PEFT branch
             watermark_processor = WatermarkLogitsProcessor(vocab=list(self.tokenizer.get_vocab().values()),
-                                               gamma=0.25,
-                                               delta=2.0,
-                                               seeding_scheme="selfhash") # Equivalent to `ff-anchored_minhash_prf-4-True-15485863`
+                                                   gamma=0.25,
+                                                   delta=2.0,
+                                                   seeding_scheme="selfhash") # Equivalent to `ff-anchored_minhash_prf-4-True-15485863`
             # Note:
             # You can turn off self-hashing by setting the seeding scheme to `minhash`.
             

@@ -7,9 +7,9 @@ data:
   destination: data/results
   embeddings: data/embeddings/main
 model:
-  model_type: causal
+  model_type: causal # ollama
   reranker_model: "dlicari/Italian-Legal-BERT" #dlicari/distil-ita-legal-bert 
-  model_path: "distilbert/distilgpt2" # tiiuae/falcon-7b-instruct #"openai-community/gpt2-large" #"tiiuae/falcon-7b" #"gemma/gemma-4b" #"TheBloke/Llama-2-7B-GPTQ" #"tiiuae/falcon-7b" #meta-llama/Meta-Llama-3-8B-Instruct #"openai-community/gpt2-large" #"dlicari/Italian-Legal-BERT-SC" #facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
+  model_path: "distilbert/distilgpt2" #"fine-tuned-llama3-8b-q8" tiiuae/falcon-7b-instruct #"openai-community/gpt2-large" #"tiiuae/falcon-7b" #"gemma/gemma-4b" #"TheBloke/Llama-2-7B-GPTQ" #"tiiuae/falcon-7b" #meta-llama/Meta-Llama-3-8B-Instruct #"openai-community/gpt2-large" #"dlicari/Italian-Legal-BERT-SC" #facebook/mbart-large-50 #Helsinki-NLP/opus-mt-it-en
   adapter_path: #models/fine_tuned_models/falcon-7b-instruct/model #models/fine_tuned_models/distilgpt2/model #models/fine_tuned_models/opus-mt-it-en-v1/model
   tokenizer_path: #models/fine_tuned_models/falcon-7b-instruct/tokenizer #"dlicari/Italian-Legal-BERT-SC" #models/fine_tuned_models/distilgpt2/tokenizer #"meta-llama/Meta-Llama-3-8B-Instruct" #facebook/mbart-large-50 #models/fine_tuned_models/opus-mt-it-en-v1/tokenizer
   embedding_model: "dlicari/Italian-Legal-BERT-SC" #dlicari/distil-ita-legal-bert #"dlicari/Italian-Legal-BERT"  #intfloat/multilingual-e5-large-instruct 
